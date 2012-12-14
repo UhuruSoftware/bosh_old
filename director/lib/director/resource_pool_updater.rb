@@ -56,7 +56,7 @@ module Bosh::Director
 
       # TODO: delete the VM if it wasn't saved
       agent = AgentClient.new(vm.agent_id)
-      agent.wait_until_ready
+      agent.wait_until_ready(3600)
 
       update_state(agent, vm, idle_vm)
 
