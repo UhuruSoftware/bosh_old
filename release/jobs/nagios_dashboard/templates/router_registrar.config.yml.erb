@@ -1,0 +1,10 @@
+---
+logging:
+  file: /var/vcap/sys/log/router_registrar/router_registrar.log
+  level: info
+mbus: nats://<%= properties.nagios.registrar.nats.user %>:<%= properties.nagios.registrar.nats.password %>@<%= properties.nagios.registrar.nats.address %>:<%= properties.nagios.registrar.nats.port %>
+uri: <%= properties.nagios.registrar.domain %>
+host: <%= spec.networks.send(properties.networks.apps).ip %>
+port: 80
+tags:
+  component: nagios

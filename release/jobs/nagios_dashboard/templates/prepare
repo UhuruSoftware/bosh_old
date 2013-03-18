@@ -1,0 +1,60 @@
+chmod 4755 /usr/bin/arping
+
+if [ -e /var/vcap/store/nagios/uhuru-hosts.cfg ] ; then
+  mv -f /var/vcap/store/nagios/uhuru-hosts.cfg /var/vcap/packages/nagios_dashboard/nagios_dashboard/config/uhuru-hosts.cfg
+fi
+
+if [ -e /var/vcap/store/nagios/uhuru-ngraph.ncfg ] ; then
+  mv -f /var/vcap/store/nagios/uhuru-ngraph.ncfg /var/vcap/packages/nagios_dashboard/nagios_dashboard/config/uhuru-ngraph.ncfg
+fi
+
+if [ ! -d /var/vcap/store/nagios/data ] ; then
+  mkdir /var/vcap/store/nagios/data
+  chown vcap /var/vcap/store/nagios/data
+fi
+
+if [ -e /var/vcap/packages/nagios/etc/cgi.cfg ] ; then
+  rm -f /var/vcap/packages/nagios/etc/cgi.cfg
+fi
+cp /var/vcap/jobs/nagios_dashboard/conf/cgi.cfg /var/vcap/packages/nagios/etc/cgi.cfg
+chmod 775 /var/vcap/packages/nagios/etc/cgi.cfg
+
+if [ -e /var/vcap/packages/nagios/etc/ngraph.d/nmgraph.ncfg ] ; then
+  rm -f /var/vcap/packages/nagios/etc/ngraph.d/nmgraph.ncfg
+fi
+
+if [ ! -e /var/vcap/packages/nagios_dashboard/nagios_dashboard/config/uhuru-hosts.cfg ] ; then
+  cp /var/vcap/jobs/nagios_dashboard/conf/localhost.cfg /var/vcap/packages/nagios_dashboard/nagios_dashboard/config/uhuru-hosts.cfg
+fi
+
+chmod -R 777 /var/vcap/packages/nagios_dashboard/nagios_dashboard/config
+
+if [ ! -f /var/vcap/packages/nagios_dashboard/nagios_dashboard/config/sshkey ] ; then
+  sudo -u vcap ssh-keygen -t rsa -f /var/vcap/packages/nagios_dashboard/nagios_dashboard/config/sshkey -q -N ""
+fi
+
+if [ -e /var/vcap/packages/nagios/etc/ngraph.ncfg ] ; then
+  rm -f /var/vcap/packages/nagios/etc/ngraph.ncfg
+fi
+
+cp /var/vcap/jobs/nagios_dashboard/conf/ngraph.ncfg /var/vcap/packages/nagios/etc/ngraph.ncfg
+chmod 775 /var/vcap/packages/nagios/etc/ngraph.ncfg
+
+if [ -e /var/vcap/packages/nagios/share/config.inc.php ] ; then
+  rm -f /var/vcap/packages/nagios/share/config.inc.php
+fi
+
+cp /var/vcap/jobs/nagios_dashboard/conf/config.inc.php /var/vcap/packages/nagios/share/config.inc.php
+chmod 775 /var/vcap/packages/nagios/share/config.inc.php
+
+if [ ! -e /var/vcap/packages/nagios_dashboard/nagios_dashboard/bin/get_metric.sh ] ; then
+  cp /var/vcap/jobs/nagios_dashboard/bin/get_metric.sh /var/vcap/packages/nagios_dashboard/nagios_dashboard/bin/get_metric.sh
+  chmod 777 /var/vcap/packages/nagios_dashboard/nagios_dashboard/bin/get_metric.sh
+fi
+
+if [ ! -e /var/vcap/packages/nagios_dashboard/nagios_dashboard/bin/send_mail.sh ] ; then
+  cp /var/vcap/jobs/nagios_dashboard/bin/send_mail.sh /var/vcap/packages/nagios_dashboard/nagios_dashboard/bin/send_mail.sh
+  chmod 777 /var/vcap/packages/nagios_dashboard/nagios_dashboard/bin/send_mail.sh
+fi
+
+chmod 777 /var/vcap/packages/nagios_dashboard/nagios_dashboard/bin/check_host.sh
