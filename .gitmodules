@@ -1,0 +1,3 @@
+[submodule "release/src/nagios_dashboard"]
+	path = release/src/nagios_dashboard
+	url = git@github.com:UhuruSoftware/private-uhuru-dashboard.git

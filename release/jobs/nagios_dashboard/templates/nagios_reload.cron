@@ -1,0 +1,1 @@
+*/5 * * * * /var/vcap/jobs/nagios_dashboard/bin/nagios_reload.sh

@@ -1,0 +1,25 @@
+check process apache
+  with pidfile /var/vcap/sys/run/apache/apache.pid
+  start program "/var/vcap/jobs/nagios_dashboard/bin/apache_ctl start"
+  stop program "/var/vcap/jobs/nagios_dashboard/bin/apache_ctl stop"
+  group vcap
+
+check process nagios
+  with pidfile /var/vcap/sys/run/nagios/nagios.pid
+  start program "/var/vcap/jobs/nagios_dashboard/bin/nagios_ctl start"
+  stop program "/var/vcap/jobs/nagios_dashboard/bin/nagios_ctl stop"
+  group vcap
+  depends on apache
+
+check process nagios_grapher
+  with pidfile /var/vcap/sys/run/nagios/nagios_grapher.pid
+  start program "/var/vcap/jobs/nagios_dashboard/bin/nagios_grapher_ctl start"
+  stop program "/var/vcap/jobs/nagios_dashboard/bin/nagios_grapher_ctl stop"
+  group vcap
+  depends on nagios
+
+check process router_registrar
+  with pidfile /var/vcap/sys/run/router_registrar/router_registrar.pid
+  start program "/var/vcap/jobs/nagios_dashboard/bin/router_registrar_ctl start"
+  stop program "/var/vcap/jobs/nagios_dashboard/bin/router_registrar_ctl stop"
+  group vcap
