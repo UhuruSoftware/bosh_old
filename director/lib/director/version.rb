@@ -2,6 +2,6 @@
 
 module Bosh
   module Director
-    VERSION = "0.7"
+    VERSION = '1.5.0.pre2'
   end
 end

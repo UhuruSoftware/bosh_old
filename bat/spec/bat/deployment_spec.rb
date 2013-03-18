@@ -4,7 +4,6 @@ require "spec_helper"
 
 describe "deployment" do
   DEPLOYED_REGEXP = /Deployed \`.*' to \`.*'/
-  SAVE_FILE = "/var/vcap/store/batarang/save"
 
   before(:all) do
     requirement stemcell
@@ -37,6 +36,7 @@ describe "deployment" do
   end
 
   it "should do two deployments from one release" do
+    pending "This fails on AWS VPC because use_static_ip only sets the eip but doesn't prevent collision" if aws?
     deployment = with_deployment
     name = deployment.name
     bosh("deployment #{deployment.to_path}")
@@ -53,8 +53,7 @@ describe "deployment" do
     deployment.delete
   end
 
-  it "should use job colocation" do
-    pending "director lacks colocation support" unless colocation?
+  it "should use job colocation", ssh: true do
     jobs = %w[
       /var/vcap/packages/batlight/bin/batlight
       /var/vcap/packages/batarang/bin/batarang
@@ -65,7 +64,7 @@ describe "deployment" do
     with_deployment do
       jobs.each do |job|
         grep = "pgrep -lf #{job}"
-        ssh(static_ip, "vcap", password, grep).should match %r{#{job}}
+        ssh(static_ip, "vcap", grep, ssh_options).should match %r{#{job}}
       end
     end
   end
@@ -107,25 +106,52 @@ describe "deployment" do
     end
   end
 
-  it "should drain when updating" do
-    use_static_ip
+  context "drain" do
+    before(:each) do
+      use_static_ip
 
-    previous = release.previous
-    use_release(previous.version)
-    bosh("upload release #{previous.to_path}")
-
-    deployment = with_deployment
-    bosh("deployment #{deployment.to_path}")
-    bosh("deploy").should succeed_with DEPLOYED_REGEXP
-    deployment.delete
-
-    use_release("latest")
-    with_deployment do
-      ssh(static_ip, "vcap", password, "ls /tmp/drain 2> /dev/null").should
-        match %r{/tmp/drain}
+      @previous = release.previous
+      if releases.include?(@previous)
+        bosh("delete release #{@previous.name} #{@previous.version}")
+      end
+      use_release(@previous.version)
+      bosh("upload release #{@previous.to_path}")
     end
 
-    bosh("delete release #{previous.name} #{previous.version}")
+    after(:each) do
+      bosh("delete release #{@previous.name} #{@previous.version}")
+    end
+
+    it "should drain when updating", ssh: true do
+      deployment = with_deployment
+      bosh("deployment #{deployment.to_path}")
+      bosh("deploy").should succeed_with DEPLOYED_REGEXP
+      deployment.delete
+
+      use_release("latest")
+      with_deployment do
+        ssh(static_ip, "vcap", "ls /tmp/drain 2> /dev/null", ssh_options).should
+          match %r{/tmp/drain}
+      end
+    end
+
+    it "should drain dynamically when updating", ssh: true do
+      use_dynamic_drain
+      use_release("latest")
+      deployment = with_deployment
+      bosh("deployment #{deployment.to_path}")
+      bosh("deploy").should succeed_with DEPLOYED_REGEXP
+      deployment.delete
+
+      use_release(@previous.version)
+      with_deployment do
+        output = ssh(static_ip, "vcap", "cat /tmp/drain 2> /dev/null", ssh_options)
+        drain_times = output.split.map { |time| time.to_i }
+        drain_times.size.should == 3
+        (drain_times[1] - drain_times[0]).should be > 3
+        (drain_times[2] - drain_times[1]).should be > 4
+      end
+    end
   end
 
   it "should return vms in a deployment" do
@@ -150,65 +176,22 @@ describe "deployment" do
     error_event["code"].should == 10001
     error_event["message"].should == "Task #{task_id} cancelled"
 
-    bosh("delete deployment #{deployment.name}")
+    deployment_names = jbosh("/deployments").map { |deployment| deployment["name"] }
+    bosh("delete deployment #{deployment.name}") if deployment_names.include? deployment.name
     deployment.delete
   end
 
   describe "network" do
     it "should deploy using dynamic network"
 
-    it "should deploy using a static network" do
+    it "should deploy using a static network", ssh: true do
+      pending "doesn't work on AWS as the VIP IP isn't visible to the VM" if aws?
       use_static_ip
       with_deployment do
-        if aws?
-          pending "doesn't work on AWS as the VIP IP isn't visible to the VM"
-        else
-          ssh(static_ip, "vcap", password, "ifconfig eth0").should
-            match /#{static_ip}/
-        end
+        ssh(static_ip, "vcap", "ifconfig eth0", ssh_options).should
+          match /#{static_ip}/
       end
     end
   end
 
-  describe "persistent disk" do
-    it "should create a disk" do
-      use_static_ip
-      use_job("batarang")
-      use_persistent_disk(2048)
-      with_deployment do
-        persistent_disk(static_ip).should_not be_nil
-      end
-    end
-
-    it "should migrate disk contents" do
-      use_static_ip
-      use_job("batarang")
-      size = nil
-
-      use_persistent_disk(2048)
-      deployment = with_deployment
-      bosh("deployment #{deployment.to_path}")
-      bosh("deploy")
-
-      ssh(static_ip, "vcap", password, "echo 'foobar' > #{SAVE_FILE}")
-      size = persistent_disk(static_ip)
-      size.should_not be_nil
-
-      use_persistent_disk(4096)
-      with_deployment do
-        persistent_disk(static_ip).should_not == size
-        ssh(static_ip, "vcap", password, "cat #{SAVE_FILE}").should match /foobar/
-      end
-      deployment.delete
-    end
-  end
-
-  it "should set vcap password" do
-    # using password 'foobar'
-    use_password('$6$tHAu4zCTso$pAQok0MTHP4newel7KMhTzMI4tQrAWwJ.X./fFAKjbWkCb5sAaavygXAspIGWn8qVD8FeT.Z/XN4dvqKzLHhl0')
-    use_static_ip
-    with_deployment do
-      ssh(static_ip, "vcap", "foobar", "cat /etc/hosts").should_not == ""
-    end
-  end
 end

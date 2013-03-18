@@ -1,13 +1,14 @@
 # Copyright (c) 2012 VMware, Inc.
+require "tmpdir"
 
 module DeploymentHelper
 
   def stemcell
-    @stemcell ||= Stemcell.from_path(read_environment('BAT_STEMCELL'))
+    @stemcell ||= Stemcell.from_path(BH::read_environment('BAT_STEMCELL'))
   end
 
   def release
-    @release ||= Release.from_path(read_environment('BAT_RELEASE_DIR'))
+    @release ||= Release.from_path(BAT_RELEASE_DIR)
   end
 
   # @return [Array[String]]
@@ -74,6 +75,10 @@ module DeploymentHelper
         puts "release not uploaded" if debug?
         bosh("upload release #{what.to_path}")
       end
+    when :no_tasks_processing
+      if tasks_processing?
+        raise "director `#{bosh_director}' is currently processing tasks"
+      end
     else
       raise "unknown requirement: #{what}"
     end
@@ -94,11 +99,12 @@ module DeploymentHelper
   end
 
   def load_deployment_spec
-    @spec ||= YAML.load_file(read_environment('BAT_DEPLOYMENT_SPEC'))
+    @spec ||= YAML.load_file(BH::read_environment('BAT_DEPLOYMENT_SPEC'))
     # Always set the batlight.missing to something, or deployments will fail.
     # It is used for negative testing.
     @spec["properties"]["batlight"] ||= {}
     @spec["properties"]["batlight"]["missing"] = "nope"
+    @spec["properties"]["dns_nameserver"] = bosh_dns_host if bosh_dns_host
   end
 
   # if with_deployment() is called without a block, it is up to the caller to
@@ -135,6 +141,19 @@ module DeploymentHelper
     end
   end
 
+  def with_tmpdir
+    dir = nil
+    back = Dir.pwd
+    Dir.mktmpdir do |tmpdir|
+      dir = tmpdir
+      Dir.chdir(dir)
+      yield dir
+    end
+  ensure
+    Dir.chdir(back)
+    FileUtils.rm_rf(dir) if dir
+  end
+
   def use_job(job)
     @spec["properties"]["job"] = job
   end
@@ -152,7 +171,7 @@ module DeploymentHelper
   end
 
   def use_job_instances(count)
-    @spec["properties"]["jobs"] = count
+    @spec["properties"]["instances"] = count
   end
 
   def use_deployment_name(name)
@@ -197,6 +216,10 @@ module DeploymentHelper
 
   def use_missing_property(property="missing")
     @spec["properties"]["batlight"].delete(property)
+  end
+
+  def use_dynamic_drain
+    @spec["properties"]["batlight"]["drain_type"] = "dynamic"
   end
 
   def get_task_id(output, state="done")

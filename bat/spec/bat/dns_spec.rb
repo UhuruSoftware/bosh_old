@@ -5,18 +5,18 @@ require "resolv"
 
 describe "dns" do
   before(:all) do
-    requirement stemcell
-    requirement release
+    if dns?
+      requirement stemcell
+      requirement release
 
-    @dns = Resolv::DNS.new(:nameserver => bosh_director)
+      @dns = Resolv::DNS.new(:nameserver => bosh_director)
 
-    load_deployment_spec
-    # TODO skip deployment if dns isn't enabled as this slows
-    # down the testing
-    use_static_ip
-    @deployment = with_deployment
-    bosh("deployment #{@deployment.to_path}")
-    bosh("deploy")
+      load_deployment_spec
+      use_static_ip
+      @deployment = with_deployment
+      bosh("deployment #{@deployment.to_path}")
+      bosh("deploy")
+    end
   end
 
   after(:all) do
@@ -34,25 +34,26 @@ describe "dns" do
   # raises Resolv::ResolvError if not found
   # Errno::ECONNREFUSED if not running
   # Resolv::ResolvTimeout
+
   context "external" do
-    it "should to forward lookups" do
+    it "should do forward lookups" do
       pending "director not configured with dns" unless dns?
-      address = @dns.getaddress("0.batlight.static.bat.bosh")
-      address.to_s.should == static_ip
+      address = @dns.getaddress("0.batlight.static.bat.#{bosh_tld}").to_s
+      address.should == static_ip
     end
 
     it "should do reverse lookups" do
       pending "director not configured with dns" unless dns?
       name = @dns.getname(static_ip)
-      name.to_s.should == "0.batlight.static.bat.bosh"
+      name.to_s.should == "0.batlight.static.bat.#{bosh_tld}"
     end
   end
 
   context "internal" do
-    it "should be able to lookup of its own name" do
+    it "should be able to lookup of its own name", ssh: true do
       pending "director not configured with dns" unless dns?
-      cmd = "nslookup 0.batlight.static.bat.bosh"
-      ssh(static_ip, "vcap", password, cmd).should match /#{static_ip}/
+      cmd = "dig +short 0.batlight.static.bat.bosh a 0.batlight.static.bat.microbosh a"
+      ssh(static_ip, "vcap", cmd, ssh_options).should match /#{static_ip}/
     end
   end
 

@@ -23,7 +23,17 @@ update:
 networks:
 - name: default
   type: dynamic
+  <% if_p('dns_nameserver') do |dns_nameserver| %>
+  dns:
+    - <%= dns_nameserver %>
+  <% end %>
+  <% if properties.security_group %>
+  cloud_properties:
+    security_groups:
+      - <%= properties.security_group %>
+  <% else %>
   cloud_properties: {}
+  <% end %>
 - name: static
   type: vip
   cloud_properties: {}
@@ -46,7 +56,7 @@ resource_pools:
 jobs:
   - name: <%= properties.job || "batlight" %>
     template: <%= properties.template || properties.job || "batlight" %>
-    instances: <%= properties.jobs %>
+    instances: <%= properties.instances %>
     resource_pool: common
     <% if properties.persistent_disk %>
     persistent_disk: <%= properties.persistent_disk %>
@@ -68,4 +78,7 @@ properties:
     <% end %>
     <% if properties.batlight.missing %>
     missing: <%= properties.batlight.missing %>
+    <% end %>
+    <% if properties.batlight.drain_type %>
+    drain_type: <%= properties.batlight.drain_type %>
     <% end %>

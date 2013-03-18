@@ -74,12 +74,12 @@ describe "property" do
       end
     end
 
-    it "should render correct properties" do
+    it "should render correct properties", ssh: true do
       use_static_ip
       with_deployment do
         props = "/var/vcap/jobs/batlight/config/properties"
         expected = "required\ntrue\n\nboth\n\nnope\n"
-        ssh(static_ip, "vcap", password, "cat #{props}").should == expected
+        ssh(static_ip, "vcap", "cat #{props}", ssh_options).should == expected
       end
     end
   end

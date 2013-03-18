@@ -1,7 +1,3 @@
-$:.unshift(File.expand_path("..", __FILE__))
-$:.unshift(File.join(File.dirname(__FILE__), "."))
-$:.unshift(File.join(File.dirname(__FILE__), "unit"))
-
 require "yaml"
 require "ruby_vcloud_sdk"
 
@@ -78,7 +74,9 @@ module VCloudSdk
   class Config
     class << self
       def logger()
-        logger = Logger.new(VCloudSdk::Test::properties["log_file"])
+        log_file = VCloudSdk::Test::properties["log_file"]
+        FileUtils.mkdir_p(File.dirname(log_file))
+        logger = Logger.new(log_file)
         logger.level = Logger::DEBUG
         logger
       end
@@ -104,4 +102,8 @@ end
 RSpec.configure do |c|
   c.treat_symbols_as_metadata_keys_with_true_values = true  # for RSpec-3
   c.filter_run :all
+
+  c.after :all do
+    FileUtils.rm_rf(File.dirname(VCloudSdk::Test::properties["log_file"]))
+  end
 end
