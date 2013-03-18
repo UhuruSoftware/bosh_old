@@ -1,0 +1,8 @@
+---
+name: nagios_dashboard
+dependencies:
+- libpq
+- ruby
+files:
+- nagios_dashboard/{Gemfile,Gemfile.lock,config/getlinuxinfo.sh,config/getwininfo.bat,config/uhuru-hosts.cfg.erb,config/uhuru-ngraph.ncfg.erb,bin/generate_nagios_config.rb,bin/get_metric.rb,bin/winexe,bin/check_host.sh,bin/send_mail.rb,bin/router_registrar,lib/router_registrar.rb}
+- nagios_dashboard/{.idea,lib,vendor}/**/*

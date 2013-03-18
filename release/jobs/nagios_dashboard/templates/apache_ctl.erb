@@ -1,0 +1,31 @@
+#!/bin/bash
+
+RUN_DIR=/var/vcap/sys/run/apache
+LOG_DIR=/var/vcap/sys/log/apache
+PIDFILE=$RUN_DIR/apache.pid
+
+case $1 in
+
+  start)
+    pid_guard $PIDFILE "Apache"
+
+    mkdir -p $RUN_DIR
+    mkdir -p $LOG_DIR
+    /usr/sbin/usermod -a -G vcap www-data
+    htpasswd -bc /var/vcap/jobs/nagios_dashboard/conf/htpasswd.users <%= properties.nagios.admin %> <%= properties.nagios.password %>
+    apache2ctl -f /var/vcap/jobs/nagios_dashboard/conf/apache.conf -k start
+
+    ;;
+
+  stop)
+    apache2ctl -f /var/vcap/jobs/nagios_dashboard/conf/apache.conf -k stop
+    kill_and_wait $PIDFILE
+    rm /var/vcap/jobs/nagios_dashboard/conf/htpasswd.users
+    ;;
+
+  *)
+    echo "Usage: apache_ctl {start|stop}"
+
+    ;;
+
+esac

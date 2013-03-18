@@ -1,0 +1,57 @@
+#! /bin/bash
+# nagios_grapher
+# Copyright (C) 2004, NETWAYS GmbH, Marius Hein
+# $Id: nagios_grapher 1198 2006-04-28 08:56:06Z gmueller $
+# Debian Startscript for the Nagiosgrapher
+
+DESC=nagios_grapher
+NAME=collect2.pl
+PATH=/bin:/usr/bin:/sbin:/usr/sbin
+DAEMON=/var/vcap/packages/nagios/contrib/$NAME
+PIDFILE=/var/vcap/sys/run/nagios/$DESC.pid
+SSD=`which start-stop-daemon`
+
+export PATH
+
+test -f $DAEMON || exit 0
+
+case "$1" in
+    start)
+        echo -n "Starting $DESC: "
+
+        # Check if the pid exists
+        if [ -f $PIDFILE ]; then
+                pid=`cat $PIDFILE`
+                if [ "$pid" ] && ps $pid > /dev/null; then
+                        echo $NAME already running \(PID: $pid\).
+                        exit 0
+                fi
+        fi
+        $SSD --start --pidfile $PIDFILE --oknodo --exec $DAEMON
+        ;;
+
+    stop)
+        echo -n "Stopping $DESC: "
+        $SSD --stop --signal TERM --pidfile $PIDFILE --oknodo
+        rm -f $PIDFILE
+        ;;
+
+    restart)
+        $0 stop
+                $0 start
+
+                exit 0
+        ;;
+
+    *)
+        echo "Usage: $NAME {start|stop|reload|restart}"
+        ;;
+esac
+
+if [ $? == 0 ]; then
+    echo $NAME.
+    exit 0
+else
+    echo failed
+    exit 1
+fi

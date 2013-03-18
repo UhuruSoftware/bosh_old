@@ -1,0 +1,4 @@
+---
+name: nagios
+files:
+- nagios/*
