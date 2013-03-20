@@ -41,7 +41,7 @@ module Bosh::Deployer
         update_agent_service_address(service, bosh_ip)
       end
 
-      services = %w{postgres director redis blobstore nats registry dns}
+      services = %w{postgres director redis blobstore nats registry dns nagios_dashboard}
       services.each do |service|
         update_service_address(service, service_ip)
       end
@@ -54,6 +54,10 @@ module Bosh::Deployer
       # TODO this override should be made more generic
       if Config.spec_properties.has_key?("ntp")
         @properties["ntp"] = Config.spec_properties["ntp"]
+      end
+
+      if Config.spec_properties.has_key?("nagios")
+        @properties["nagios"] = Config.spec_properties["nagios"]
       end
 
       if Config.spec_properties.has_key?("compiled_package_cache")

@@ -18,8 +18,10 @@ check process nagios_grapher
   group vcap
   depends on nagios
 
+<% if properties.nagios.registrar %>
 check process router_registrar
   with pidfile /var/vcap/sys/run/router_registrar/router_registrar.pid
   start program "/var/vcap/jobs/nagios_dashboard/bin/router_registrar_ctl start"
   stop program "/var/vcap/jobs/nagios_dashboard/bin/router_registrar_ctl stop"
   group vcap
+<% end %>
