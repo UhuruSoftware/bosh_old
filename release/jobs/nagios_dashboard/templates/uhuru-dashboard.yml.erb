@@ -45,16 +45,16 @@ legacy:
   <% end %>
 windows:
   base:
-    cpu_time: 'typeperf -sc 1 "\processor(_total)\% processor time" & echo done'
+    cpu_time: 'typeperf -sc 1 "\processor(_total)\% processor time"'
     system_info: 'systeminfo'
     disk_usage_c: 'fsutil volume diskfree c:'
   win_dea:
-    dropletcountfolder: 'dir C:\Droplets\apps'
+    dropletcountfolder: 'dir C:\vcap\data\win_dea\db\apps'
     workerprocesses: 'tasklist'
-    deaprocessmemory: 'typeperf -sc 1 "\process(dea)\working set - private" & echo done'
+    deaprocessmemory: 'typeperf -sc 1 "\process(dea)\working set - private"'
     iiswebsitecount: '%systemroot%\system32\inetsrv\appcmd list app'
-    config: 'type "C:\Program Files\Uhuru Software\Uhuru .NET Droplet Execution Agent\uhuru.config" & echo done'
-    dropletdata: 'type "C:\Droplets\db\applications.json"'
+    config: 'type "C:\vcap\packages\win_dea\uhuru.config"'
+    dropletdata: 'type "C:\vcap\data\win_dea\db\db\applications.json"'
   mssql_node:
     databasesondrive: 'dir C:\nagios\data'
     sqlservermemory: 'typeperf -sc 1 "\process(sqlservr)\working set - private" & echo done'
@@ -70,7 +70,7 @@ windows:
 
 linux:
   base:
-    cpu_time: top -b -n 1 |grep ^Cpu
+    cpu_time: top -b -n 2 |grep ^Cpu
     system_info: free -m
     disk_usage: df
   dea:
@@ -79,6 +79,7 @@ linux:
     deaprocessmemory: ps aux | grep jobs/dea
     config: cat /var/vcap/jobs/dea/config/dea.yml
     dropletdata: cat /var/vcap/data/dea/db/applications.json
+    corrupt_uhurufs_bindings: mount|grep -w bind|cut -f 3 -d \ |while read i;do ls $i 1>/dev/null 2>&1 || echo error ;done|wc -l
   mysql_node:
     databasesondrive: ls /var/vcap/store/mysql/ -la
     servermemory: ps aux | grep libexec/mysqld
