@@ -12,7 +12,7 @@ namespace :stemcell do
     options = default_options(args)
     options[:stemcell_name] ||= "bosh-stemcell"
     options[:stemcell_version] ||= Bosh::Agent::VERSION
-    options[:image_create_disk_size] = 1380
+    options[:image_create_disk_size] = 2760
 
     options = options.merge(bosh_agent_options)
 
@@ -25,9 +25,9 @@ namespace :stemcell do
     manifest = File.join(File.expand_path(File.dirname(__FILE__)), "..", "release", "micro","#{args[:infrastructure]}.yml")
 
     options = default_options(args)
-    options[:stemcell_name] ||= "micro-bosh-stemcell"
-    options[:stemcell_version] ||= "0.8.1"
-    options[:image_create_disk_size] = 2048
+    options[:stemcell_name] ||= "micro-bosh-stemcell-nagios"
+    options[:stemcell_version] ||= "0.8.1.1"
+    options[:image_create_disk_size] = 4096
 
     options = options.merge(bosh_agent_options)
     options = options.merge(bosh_micro_options(manifest, release_tarball))
