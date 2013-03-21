@@ -1,42 +1,21 @@
 #!/bin/bash
 
-
-
 LOG_DIR=/var/vcap/sys/log/nagios
 
 case $1 in
 
   start)
-
-       mkdir -p /var/vcap/sys/run/nagios
-       mkdir -p /var/vcap/sys/log/nagios
-       mkdir -p /var/vcap/store/nagios/etc/serviceext
-       mkdir -p /var/vcap/store/nagios/rrd/
-       mkdir -p /var/vcap/data/tmp/nagiosgrapher
-
-       chown -R vcap /var/vcap/packages/nagios/
-       chown -R vcap /var/vcap/sys/run/nagios/
-       chown -R vcap /var/vcap/store/nagios/
-       chown -R vcap /var/vcap/sys/log/nagios/
-       chmod -R 777 /var/vcap/data/tmp/
-
-       if [ ! -e /var/vcap/packages/nagios_dashboard/nagios_dashboard/config/uhuru-dashboard.yml ] ; then
-         ln -s /var/vcap/jobs/nagios_dashboard/conf/uhuru-dashboard.yml /var/vcap/packages/nagios_dashboard/nagios_dashboard/config/uhuru-dashboard.yml
-       fi
-
-       /var/vcap/jobs/nagios_dashboard/bin/prepare >>$LOG_DIR/prepare.stdout.log 2>>$LOG_DIR/prepare.stderr.log
+       mkdir -p $LOG_DIR
+       chown -R $LOG_DIR
+       /var/vcap/jobs/nagios_dashboard/bin/init >>$LOG_DIR/init.stdout.log 2>>$LOG_DIR/init.stderr.log
 
        /var/vcap/jobs/nagios_dashboard/bin/nagios start >>$LOG_DIR/nagios.stdout.log 2>>$LOG_DIR/nagios.stderr.log
-       /var/vcap/jobs/nagios_dashboard/bin/nagios_grapher start >>$LOG_DIR/nagios_grapher.stdout.log 2>>$LOG_DIR/nagios_grapher.stderr.log
-       (crontab -l | sed /nagios_reload/d; cat /var/vcap/jobs/nagios_dashboard/conf/nagios_reload.cron) | sed /^$/d | crontab
+       (crontab -l | sed /nagios_reload/d; cat /var/vcap/jobs/nagios_dashboard/config/nagios_reload.cron) | sed /^$/d | crontab
     ;;
 
   stop)
         /var/vcap/jobs/nagios_dashboard/bin/nagios stop
-        /var/vcap/jobs/nagios_dashboard/bin/nagios_grapher stop
         crontab -l | sed /nagios_reload/d | crontab
-        rm -f /var/vcap/packages/nagios_dashboard/nagios_dashboard/config/sshkey
-        rm -f /var/vcap/packages/nagios_dashboard/nagios_dashboard/config/sshkey.pub
     ;;
 
   *)

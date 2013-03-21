@@ -41,14 +41,14 @@ tar xzf nagios/rrdtool-1.4.5.tar.gz
     make install
 )
 
-tar xzf nagios/NagiosGrapher-1.7.1.tar.gz
+tar xzf nagios/pnp4nagios-0.6.19.tar.gz
 
 (
-    cd NagiosGrapher-1.7.1
+    cd pnp4nagios-0.6.19
     export CPPFLAGS=-I${BOSH_INSTALL_TARGET}/include
     export LDFLAGS=-L${BOSH_INSTALL_TARGET}/lib
-    autoconf
-    ./configure --prefix=${BOSH_INSTALL_TARGET} --with-nagios-user=vcap --with-nagios-group=vcap
-    make > /dev/null # too much output for bosh agent to handle
+    ./configure --prefix=${BOSH_INSTALL_TARGET}/pnp4nagios --with-nagios-user=vcap --with-nagios-group=vcap --with-rrdtool=${BOSH_INSTALL_TARGET}/bin/rrdtool --with-perfdata-dir=/var/vcap/store/nagios/perfdata
+    make all
     make install
+    cp contrib/ssi/status-header.ssi ${BOSH_INSTALL_TARGET}/share/ssi/status-header.ssi
 )

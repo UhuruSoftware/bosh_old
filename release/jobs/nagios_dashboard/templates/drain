@@ -1,4 +1,3 @@
 cp -f /var/vcap/packages/nagios_dashboard/nagios_dashboard/config/uhuru-hosts.cfg /var/vcap/store/nagios/uhuru-hosts.cfg
-cp -f /var/vcap/packages/nagios_dashboard/nagios_dashboard/config/uhuru-ngraph.ncfg /var/vcap/store/nagios/uhuru-ngraph.ncfg
 echo 0
 exit 0

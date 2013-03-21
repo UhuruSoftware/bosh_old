@@ -11,10 +11,10 @@ check process nagios
   group vcap
   depends on apache
 
-check process nagios_grapher
-  with pidfile /var/vcap/sys/run/nagios/nagios_grapher.pid
-  start program "/var/vcap/jobs/nagios_dashboard/bin/nagios_grapher_ctl start"
-  stop program "/var/vcap/jobs/nagios_dashboard/bin/nagios_grapher_ctl stop"
+check process pnp4nagios
+  with pidfile /var/vcap/sys/run/nagios/npcd.pid
+  start program "/var/vcap/jobs/nagios_dashboard/bin/npcd_ctl start"
+  stop program "/var/vcap/jobs/nagios_dashboard/bin/npcd_ctl stop"
   group vcap
   depends on nagios
 

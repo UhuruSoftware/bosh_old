@@ -209,7 +209,7 @@ Include /etc/apache2/mods-enabled/*.conf
 
 # Include ports listing
 # Include /etc/apache2/ports.conf
-Listen 80
+Listen 81
 
 #
 # The following directives define some format nicknames for use with
@@ -235,7 +235,38 @@ CustomLog /var/vcap/sys/log/apache/other_vhosts_access.log vhost_combined
 # Include the virtual host configurations:
 # Include /etc/apache2/sites-enabled/
 
-<VirtualHost *:80>
+  Alias /pnp4nagios "/var/vcap/packages/nagios/pnp4nagios/share"
+  Alias /nagios "/var/vcap/packages/nagios/share"
+
+  <Directory "/var/vcap/packages/nagios/pnp4nagios/share">
+          AllowOverride None
+          Order allow,deny
+          Allow from all
+          #
+          # Use the same value as defined in nagios.conf
+          #
+          AuthName "Nagios Access"
+          AuthType Basic
+          AuthUserFile /var/vcap/jobs/nagios_dashboard/config/htpasswd.users
+          Require valid-user
+          <IfModule mod_rewrite.c>
+                  # Turn on URL rewriting
+                  RewriteEngine On
+                  Options symLinksIfOwnerMatch
+                  # Installation directory
+                  RewriteBase /pnp4nagios/
+                  # Protect application and system files from being viewed
+                  RewriteRule "^(?:application|modules|system)/" - [F]
+                  # Allow any files or directories that exist to be displayed directly
+                  RewriteCond "%{REQUEST_FILENAME}" !-f
+                  RewriteCond "%{REQUEST_FILENAME}" !-d
+                  # Rewrite all other URLs to index.php/URL
+                  RewriteRule "^.*$" "index.php/$0" [PT]
+          </IfModule>
+  </Directory>
+
+
+<VirtualHost *:81>
   DocumentRoot /var/vcap/packages/nagios/share
   <Directory "/var/vcap/packages/nagios/share">
 #  SSLRequireSSL
@@ -248,7 +279,7 @@ CustomLog /var/vcap/sys/log/apache/other_vhosts_access.log vhost_combined
 #  Allow from 127.0.0.1
    AuthName "Nagios Access"
    AuthType Basic
-   AuthUserFile /var/vcap/jobs/nagios_dashboard/conf/htpasswd.users
+   AuthUserFile /var/vcap/jobs/nagios_dashboard/config/htpasswd.users
    Require valid-user
   </Directory>
   ScriptAlias /nagios/cgi-bin "/var/vcap/packages/nagios/sbin"
@@ -264,7 +295,7 @@ CustomLog /var/vcap/sys/log/apache/other_vhosts_access.log vhost_combined
 #  Allow from 127.0.0.1
    AuthName "Nagios Access"
    AuthType Basic
-   AuthUserFile /var/vcap/jobs/nagios_dashboard/conf/htpasswd.users
+   AuthUserFile /var/vcap/jobs/nagios_dashboard/config/htpasswd.users
    Require valid-user
   </Directory>
   ErrorLog /var/vcap/sys/log/apache/error.log

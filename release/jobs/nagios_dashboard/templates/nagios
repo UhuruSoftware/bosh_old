@@ -92,7 +92,7 @@ fi
 prefix=/var/vcap/packages/nagios
 exec_prefix=${prefix}
 NagiosBin=${exec_prefix}/bin/nagios
-NagiosCfgFile=/var/vcap/jobs/nagios_dashboard/conf/nagios.cfg
+NagiosCfgFile=/var/vcap/jobs/nagios_dashboard/config/nagios.cfg
 NagiosStatusFile=/var/vcap/packages/nagios/var/status.dat
 NagiosRetentionFile=/var/vcap/store/nagios/retention.dat
 NagiosCommandFile=/var/vcap/packages/nagios/var/rw/nagios.cmd

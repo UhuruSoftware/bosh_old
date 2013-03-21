@@ -59,14 +59,14 @@ windows:
     databasesondrive: 'dir C:\nagios\data'
     sqlservermemory: 'typeperf -sc 1 "\process(sqlservr)\working set - private" & echo done'
     nodeprocessmemory: 'typeperf -sc 1 "\process(mssqlnode)\working set - private" & echo done'
-    config: 'type "C:\Program Files\Uhuru Software\Uhuru Services for Microsoft SQL Server\uhuru.config"'
-    servicedb: 'type "C:\Program Files\Uhuru Software\Uhuru Services for Microsoft SQL Server\localDb.xml"'
+    config: 'type "C:\vcap\packages\mssql_node\uhuru.config"'
+    servicedb: 'type "C:\vcap\packages\mssql_node\localDb.xml"'
   uhurufs_node:
     datafolders: 'dir C:\nagios\data'
     iiswebsitecount: '%systemroot%\system32\inetsrv\appcmd list app'
-    config: 'type "C:\Program Files\Uhuru Software\Uhuru FileService\uhuru.config" & echo done'
+    config: 'type "C:\vcap\packages\uhurufs_node\uhuru.config" & echo done'
     nodeprocessmemory: 'typeperf -sc 1 "\process(fileservicenode)\working set - private" & echo done'
-    servicedb: 'type "C:\Program Files\Uhuru Software\Uhuru FileService\localDb.xml"'
+    servicedb: 'type "C:\vcap\packages\uhurufs_node\localDb.xml"'
 
 linux:
   base:

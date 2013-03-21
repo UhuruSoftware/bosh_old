@@ -1,27 +1,29 @@
 ---
 name: nagios_dashboard
 templates:
-  nagios_ctl: bin/nagios_ctl
-  drain: bin/drain
-  nagios: bin/nagios
-  cgi.cfg.erb: conf/cgi.cfg
-  config.inc.php: conf/config.inc.php
-  prepare: bin/prepare
+  apache.conf.erb: config/apache.conf
   apache_ctl.erb: bin/apache_ctl
-  nagios.cfg: conf/nagios.cfg
-  apache.conf.erb: conf/apache.conf
+  cgi.cfg.erb: config/cgi.cfg
+  config.inc.php: config/config.inc.php
+  config.php: config/config.php
+  drain: bin/drain
   get_metric.sh: bin/get_metric.sh
-  send_mail.sh: bin/send_mail.sh
-  uhuru-dashboard.yml.erb: conf/uhuru-dashboard.yml
-  nagios_grapher: bin/nagios_grapher
-  nagios_grapher_ctl: bin/nagios_grapher_ctl
-  nagios_reload.cron: conf/nagios_reload.cron
+  init: bin/init
+  localhost.cfg: config/localhost.cfg
+  nagios: bin/nagios
+  nagios.cfg: config/nagios.cfg
+  nagios_ctl: bin/nagios_ctl
+  nagios_reload.cron: config/nagios_reload.cron
   nagios_reload.sh: bin/nagios_reload.sh
-  ngraph.ncfg: conf/ngraph.ncfg
-  localhost.cfg: conf/localhost.cfg
-  process_commands.cfg: conf/process_commands.cfg
-  router_registrar.config.yml.erb: conf/router_registrar.config.yml
+  npcd: bin/npcd
+  npcd.cfg: config/npcd.cfg
+  npcd_ctl: bin/npcd_ctl
+  process_commands.cfg: config/process_commands.cfg
+  process_perfdata.cfg: config/process_perfdata.cfg
+  router_registrar.config.yml.erb: config/router_registrar.config.yml
   router_registrar_ctl.erb: bin/router_registrar_ctl
+  send_mail.sh: bin/send_mail.sh
+  uhuru-dashboard.yml.erb: config/uhuru-dashboard.yml
 packages:
   - nagios
   - nagios_dashboard

@@ -1,0 +1,22 @@
+#!/bin/bash
+
+LOG_DIR=/var/vcap/sys/log/nagios
+
+case $1 in
+
+  start)
+       touch /var/vcap/sys/log/nagios/npcd.log
+       chown vcap /var/vcap/sys/log/nagios/npcd.log
+       /var/vcap/jobs/nagios_dashboard/bin/npcd start >>$LOG_DIR/npcd.stdout.log 2>>$LOG_DIR/npcd.stderr.log
+    ;;
+
+  stop)
+        /var/vcap/jobs/nagios_dashboard/bin/npcd stop
+    ;;
+
+  *)
+    echo "Usage: npcd_ctl {start|stop}"
+
+    ;;
+
+esac

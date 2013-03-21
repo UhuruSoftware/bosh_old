@@ -17,7 +17,7 @@ case $1 in
     mkdir -p $LOG_DIR
     echo $$ > $PIDFILE
 
-    export CONFIG_FILE=/var/vcap/jobs/nagios_dashboard/conf/router_registrar.config.yml
+    export CONFIG_FILE=/var/vcap/jobs/nagios_dashboard/config/router_registrar.config.yml
 
     cd /var/vcap/packages/nagios_dashboard/nagios_dashboard
 

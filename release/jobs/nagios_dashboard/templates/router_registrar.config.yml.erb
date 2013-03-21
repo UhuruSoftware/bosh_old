@@ -6,7 +6,7 @@ logging:
 mbus: nats://<%= properties.nagios.registrar.nats.user %>:<%= properties.nagios.registrar.nats.password %>@<%= properties.nagios.registrar.nats.address %>:<%= properties.nagios.registrar.nats.port %>
 uri: <%= properties.nagios.registrar.domain %>
 host: <%= spec.networks.send(properties.networks.apps).ip %>
-port: 80
+port: 81
 <% end %>
 tags:
   component: nagios
