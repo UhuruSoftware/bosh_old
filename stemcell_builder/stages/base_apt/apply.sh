@@ -13,7 +13,11 @@ curl wget libcurl3 libcurl3-dev bison libreadline6-dev \
 libxml2 libxml2-dev libxslt1.1 libxslt1-dev zip unzip \
 nfs-common flex psmisc apparmor-utils iptables sysstat \
 rsync openssh-server traceroute libncurses5-dev quota \
-libaio1 gdb tripwire libcap2-bin libyaml-dev"
+libaio1 gdb tripwire libcap2-bin libyaml-dev \
+libpcre3 libpcre3-dev apache2 libapr1 libaprutil1 php5 php5-dev \
+php5-mysql php5-pgsql php5-gd php5-common php5-curl php5-mcrypt \
+php5-imagick php5-xmlrpc php5-imap php-pear zend-framework \
+freetds-common freetds-bin unixodbc php5-sybase smbfs"
 
 # Disable interactive dpkg
 debconf="debconf debconf/frontend select noninteractive"
@@ -53,3 +57,8 @@ apt_get dist-upgrade
 
 # Install base debs needed by both the warden and bosh
 apt_get install $debs
+
+run_in_chroot $chroot "
+/etc/init.d/apache2 stop
+update-rc.d -f apache2 remove
+"

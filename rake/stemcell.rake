@@ -17,6 +17,16 @@ namespace :stemcell do
     build("stemcell-#{args[:infrastructure]}", options)
   end
 
+  desc "Build php stemcell"
+  task :basic_php, [:infrastructure] => "all:finalize_release_directory"  do |t, args|
+    options = default_options(args)
+    options[:stemcell_name] ||= "bosh-stemcell-php"
+    options[:stemcell_version] ||= Bosh::Agent::VERSION
+    options[:image_create_disk_size] = 1680
+
+    build("stemcell-#{args[:infrastructure]}", options)
+  end
+
   desc "Build micro bosh stemcell"
   task :micro, [:infrastructure] => "all:finalize_release_directory" do |t, args|
     release_tarball = build_micro_bosh_release
