@@ -1,8 +1,22 @@
 set -e
 
 mkdir -p ${BOSH_INSTALL_TARGET}/{bin,gem_home}
-cd nagios_dashboard/vendor/cache
+cp -a * ${BOSH_INSTALL_TARGET}
+cd ${BOSH_INSTALL_TARGET}/nagios_dashboard/vendor/cache
 
 gem_cmd="/var/vcap/packages/ruby/bin/gem install --local --no-ri --no-rdoc -w -n ${BOSH_INSTALL_TARGET}/bin -i ${BOSH_INSTALL_TARGET}/gem_home"
 libpq_dir=/var/vcap/packages/libpq
-$gem_cmd *.gem --with-pg-lib=$libpq_dir/lib --with-pg-include=$libpq_dir/include
+$gem_cmd pg-0.14.1.gem -- --with-pg-lib=$libpq_dir/lib --with-pg-include=$libpq_dir/include
+$gem_cmd bcrypt-ruby-3.0.1.gem
+$gem_cmd daemons-1.1.9.gem
+$gem_cmd eventmachine-0.12.10.gem
+$gem_cmd json_pure-1.7.6.gem
+$gem_cmd rack-1.4.4.gem
+$gem_cmd nats-0.4.28.gem
+$gem_cmd net-ssh-2.6.2.gem
+$gem_cmd net-sftp-2.0.5.gem
+$gem_cmd rake-10.0.3.gem
+$gem_cmd thin-1.5.0.gem
+$gem_cmd uuidtools-2.1.3.gem
+$gem_cmd vcap_logging-0.1.4.gem
+$gem_cmd yajl-ruby-1.1.0.gem
