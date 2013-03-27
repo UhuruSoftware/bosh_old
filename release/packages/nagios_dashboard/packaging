@@ -5,4 +5,5 @@ cd nagios_dashboard/vendor/cache
 
 gem_cmd="/var/vcap/packages/ruby/bin/gem install --local --no-ri --no-rdoc -w -n ${BOSH_INSTALL_TARGET}/bin -i ${BOSH_INSTALL_TARGET}/gem_home"
 libpq_dir=/var/vcap/packages/libpq
-$gem_cmd *.gem --with-pg-lib=$libpq_dir/lib --with-pg-include=$libpq_dir/include
+$gem_cmd pg-0.14.1.gem --with-pg-lib=$libpq_dir/lib --with-pg-include=$libpq_dir/include
+$gem_cmd *.gem
