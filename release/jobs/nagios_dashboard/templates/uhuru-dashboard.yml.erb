@@ -11,6 +11,7 @@ director:
   port: <%= properties.director.port %>
   user: <%= properties.nagios.director_user %>
   password: <%= properties.nagios.director_password %>
+  create_user: <%= properties.nagios.create_director_user || false %>
 
 default_warn_level: 80
 default_critical_level: 90
