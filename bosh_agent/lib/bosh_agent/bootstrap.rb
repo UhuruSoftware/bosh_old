@@ -247,7 +247,7 @@ module Bosh::Agent
       tmp_permissions
 
       unless Pathname.new('/tmp').mountpoint?
-        tmp_size = 128
+        tmp_size = 1024 * 12
         root_tmp = File.join(base_dir, 'data', 'root_tmp')
 
         # If it's not mounted on /tmp - we don't care - blow it away
