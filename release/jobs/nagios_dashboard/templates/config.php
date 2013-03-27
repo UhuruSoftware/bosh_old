@@ -85,7 +85,7 @@ $conf['max_age'] = 60*60*6;
 #
 # Directory for temporary files used for PDF creation
 #
-$conf['temp'] = "/var/vcap/tmp";
+$conf['temp'] = "/var/vcap/data/nagios_tmp";
 #
 # Link back to Nagios or Thruk ( www.thruk.org )
 #

@@ -11,7 +11,8 @@ chown -R vcap /var/vcap/packages/nagios/
 chown -R vcap /var/vcap/sys/run/nagios/
 chown -R vcap /var/vcap/store/nagios/
 
-chmod -R 777 /var/vcap/data/tmp/
+mkdir /var/vcap/data/nagios_tmp
+chmod -R 777 /var/vcap/data/nagios_tmp
 
 chmod 4755 /usr/bin/arping
 
