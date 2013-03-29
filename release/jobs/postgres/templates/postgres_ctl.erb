@@ -40,11 +40,14 @@ case "$1" in
       echo "PostgreSQL 9.0 started successfully"
       head -n 1 $DATA_DIR/postmaster.pid > $PIDFILE
 
-      echo "Trying to create database..."
-      su - vcap -c "LD_LIBRARY_PATH=$PACKAGE_DIR/lib:$LD_LIBRARY_PATH $PACKAGE_DIR/bin/createdb $DBNAME -p $PORT"
+      LD_LIBRARY_PATH=$PACKAGE_DIR/lib:$LD_LIBRARY_PATH $PACKAGE_DIR/bin/psql -U vcap -d $DBNAME -c "SELECT version();" >/dev/null 2>&1 ||
+      {
+        echo "Trying to create database..."
+        su - vcap -c "LD_LIBRARY_PATH=$PACKAGE_DIR/lib:$LD_LIBRARY_PATH $PACKAGE_DIR/bin/createdb $DBNAME -p $PORT"
 
-      echo "Trying to create user..."
-      LD_LIBRARY_PATH=$PACKAGE_DIR/lib:$LD_LIBRARY_PATH $PACKAGE_DIR/bin/psql -d $DBNAME -p $PORT -U vcap -c "create role \"$USER\" NOSUPERUSER LOGIN INHERIT CREATEDB"
+        echo "Trying to create user..."
+        LD_LIBRARY_PATH=$PACKAGE_DIR/lib:$LD_LIBRARY_PATH $PACKAGE_DIR/bin/psql -d $DBNAME -p $PORT -U vcap -c "create role \"$USER\" NOSUPERUSER LOGIN INHERIT CREATEDB"
+      }
 
       echo "Trying to alter user (to change password)..."
       LD_LIBRARY_PATH=$PACKAGE_DIR/lib:$LD_LIBRARY_PATH $PACKAGE_DIR/bin/psql -d $DBNAME -p $PORT -U vcap -c "alter role \"$USER\" with password '$PASSWORD'"
