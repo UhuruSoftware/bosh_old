@@ -17,6 +17,9 @@ default_warn_level: 80
 default_critical_level: 90
 data_dir: /var/vcap/store/nagios/data/
 
+alerts:
+  email_to: "<%= properties.nagios.alerts.email_to || "" %>"
+
 email:
   from: "<%= properties.nagios.email.from || "postmaster@uhurusoftware.mailgun.org" %>"
   from_alias: "<%= properties.nagios.email.from_alias || "Nagios" %>"
