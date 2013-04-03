@@ -6,7 +6,8 @@ case $1 in
 
   start)
        mkdir -p $LOG_DIR
-       chown -R $LOG_DIR
+       chown -R vcap:vcap $LOG_DIR
+       chown vcap:vcap /var/vcap/packages/nagios_dashboard/nagios_dashboard/Gemfile.lock
        /var/vcap/jobs/nagios_dashboard/bin/init >>$LOG_DIR/init.stdout.log 2>>$LOG_DIR/init.stderr.log
 
        /var/vcap/jobs/nagios_dashboard/bin/nagios start >>$LOG_DIR/nagios.stdout.log 2>>$LOG_DIR/nagios.stderr.log
