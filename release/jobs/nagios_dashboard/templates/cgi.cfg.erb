@@ -74,10 +74,7 @@ use_pending_states=1
 # authentication (bad idea), while any other value will make them
 # use the authentication functions (the default).
 
-use_authentication=1
-
-
-
+use_authentication=<%= properties.nagios.secure ? 1 : 0 %>
 
 # x509 CERT AUTHENTICATION
 # When enabled, this option allows you to use x509 cert (SSL)
@@ -115,7 +112,7 @@ use_ssl_authentication=0
 # not use authorization.  You may use an asterisk (*) to
 # authorize any user who has authenticated to the web server.
 
-authorized_for_system_information=<%= properties.nagios.admin %>
+authorized_for_system_information=<%= properties.nagios.secure ? properties.nagios.admin : "" %>
 
 
 
@@ -127,7 +124,7 @@ authorized_for_system_information=<%= properties.nagios.admin %>
 # an asterisk (*) to authorize any user who has authenticated
 # to the web server.
 
-authorized_for_configuration_information=<%= properties.nagios.admin %>
+authorized_for_configuration_information=<%= properties.nagios.secure ? properties.nagios.admin : "" %>
 
 
 
@@ -140,7 +137,7 @@ authorized_for_configuration_information=<%= properties.nagios.admin %>
 # You may use an asterisk (*) to authorize any user who has
 # authenticated to the web server.
 
-authorized_for_system_commands=<%= properties.nagios.admin %>
+authorized_for_system_commands=<%= properties.nagios.secure ? properties.nagios.admin : "" %>
 
 
 
@@ -153,8 +150,8 @@ authorized_for_system_commands=<%= properties.nagios.admin %>
 # to authorize any user who has authenticated to the web server.
 
 
-authorized_for_all_services=<%= properties.nagios.admin %>
-authorized_for_all_hosts=<%= properties.nagios.admin %>
+authorized_for_all_services=<%= properties.nagios.secure ? properties.nagios.admin : "" %>
+authorized_for_all_hosts=<%= properties.nagios.secure ? properties.nagios.admin : "" %>
 
 
 
@@ -167,8 +164,8 @@ authorized_for_all_hosts=<%= properties.nagios.admin %>
 # authorization).  You may use an asterisk (*) to authorize any
 # user who has authenticated to the web server.
 
-authorized_for_all_service_commands=<%= properties.nagios.admin %>
-authorized_for_all_host_commands=<%= properties.nagios.admin %>
+authorized_for_all_service_commands=<%= properties.nagios.secure ? properties.nagios.admin : "" %>
+authorized_for_all_host_commands=<%= properties.nagios.secure ? properties.nagios.admin : "" %>
 
 
 

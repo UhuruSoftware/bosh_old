@@ -14,8 +14,9 @@ case $1 in
     mkdir -p $RUN_DIR
     mkdir -p $LOG_DIR
     /usr/sbin/usermod -a -G vcap www-data
+    <% if properties.nagios.secure %>
     htpasswd -bc /var/vcap/jobs/nagios_dashboard/config/htpasswd.users <%= properties.nagios.admin %> <%= properties.nagios.password %>
-
+    <% end %>
     touch /var/vcap/packages/nagios/pnp4nagios/share/install.ignore
     apache2ctl -f /var/vcap/jobs/nagios_dashboard/config/apache.conf -k start
 
