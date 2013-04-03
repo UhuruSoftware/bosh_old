@@ -209,7 +209,11 @@ Include /etc/apache2/mods-enabled/*.conf
 
 # Include ports listing
 # Include /etc/apache2/ports.conf
-Listen 81
+<% if properties.nagios.is_public %>
+Listen <%= properties.nagios.port || 81 %>
+<% else %>
+Listen 127.0.0.1:<%= properties.nagios.port || 81 %>
+<% end %>
 
 #
 # The following directives define some format nicknames for use with
@@ -245,10 +249,12 @@ CustomLog /var/vcap/sys/log/apache/other_vhosts_access.log vhost_combined
           #
           # Use the same value as defined in nagios.conf
           #
+          <% if properties.nagios.secure %>
           AuthName "Nagios Access"
           AuthType Basic
           AuthUserFile /var/vcap/jobs/nagios_dashboard/config/htpasswd.users
           Require valid-user
+          <% end %>
           <IfModule mod_rewrite.c>
                   # Turn on URL rewriting
                   RewriteEngine On
@@ -277,10 +283,12 @@ CustomLog /var/vcap/sys/log/apache/other_vhosts_access.log vhost_combined
 #  Order deny,allow
 #  Deny from all
 #  Allow from 127.0.0.1
+   <% if properties.nagios.secure %>
    AuthName "Nagios Access"
    AuthType Basic
    AuthUserFile /var/vcap/jobs/nagios_dashboard/config/htpasswd.users
    Require valid-user
+   <% end %>
   </Directory>
   ScriptAlias /nagios/cgi-bin "/var/vcap/packages/nagios/sbin"
 
@@ -293,10 +301,12 @@ CustomLog /var/vcap/sys/log/apache/other_vhosts_access.log vhost_combined
 #  Order deny,allow
 #  Deny from all
 #  Allow from 127.0.0.1
+   <% if properties.nagios.secure %>
    AuthName "Nagios Access"
    AuthType Basic
    AuthUserFile /var/vcap/jobs/nagios_dashboard/config/htpasswd.users
    Require valid-user
+   <% end %>
   </Directory>
   ErrorLog /var/vcap/sys/log/apache/error.log
   LogLevel warn
