@@ -71,6 +71,13 @@ windows:
     config: 'type "C:\vcap\packages\uhurufs_node\uhuru.config" & echo done'
     nodeprocessmemory: 'typeperf -sc 1 "\process(fileservicenode)\working set - private" & echo done'
     servicedb: 'type "C:\vcap\packages\uhurufs_node\localDb.xml"'
+  uhuru_tunnel:
+    dropletcountfolder: 'dir C:\vcap\data\win_dea\db\apps'
+    workerprocesses: 'tasklist'
+    deaprocessmemory: 'typeperf -sc 1 "\process(dea)\working set - private"'
+    iiswebsitecount: '%systemroot%\system32\inetsrv\appcmd list app'
+    config: 'type "C:\vcap\packages\win_dea\uhuru.config"'
+    dropletdata: 'type "C:\vcap\data\win_dea\db\db\applications.json"'
 
 linux:
   base:
