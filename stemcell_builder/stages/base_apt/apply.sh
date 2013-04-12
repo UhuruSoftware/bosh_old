@@ -19,7 +19,7 @@ php5-mysql php5-pgsql php5-gd php5-common php5-curl php5-mcrypt \
 php5-imagick php5-xmlrpc php5-imap php-pear zend-framework \
 freetds-common freetds-bin unixodbc php5-sybase smbfs \
 libpango1.0-dev libgd-gd2-perl perlmagick libcalendar-simple-perl \
-librrds-perl libgd2-xpm-dev"
+librrds-perl libgd2-xpm-dev mkpasswd"
 
 
 # Disable interactive dpkg
@@ -60,3 +60,8 @@ apt_get dist-upgrade
 
 # Install base debs needed by both the warden and bosh
 apt_get install $debs
+
+run_in_chroot $chroot "
+/etc/init.d/apache2 stop
+update-rc.d -f apache2 remove
+"

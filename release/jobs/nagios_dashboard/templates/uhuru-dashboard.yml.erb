@@ -20,6 +20,7 @@ ssh_reset_interval_min: 1440
 
 alerts:
   email_to: "<%= properties.nagios.alerts.email_to || "" %>"
+  notification_interval: 0
 
 email:
   from: "<%= properties.nagios.email.from || "postmaster@uhurusoftware.mailgun.org" %>"
