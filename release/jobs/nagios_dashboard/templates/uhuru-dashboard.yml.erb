@@ -54,6 +54,7 @@ windows:
     cpu_time: 'typeperf -sc 1 "\processor(_total)\% processor time"'
     system_info: 'systeminfo'
     disk_usage_c: 'fsutil volume diskfree c:'
+    license_info: 'cscript c:\windows\system32\slmgr.vbs -dli'
   win_dea:
     dropletcountfolder: 'dir C:\vcap\data\win_dea\db\apps'
     workerprocesses: 'tasklist'
@@ -62,17 +63,17 @@ windows:
     config: 'type "C:\vcap\packages\win_dea\uhuru.config"'
     dropletdata: 'type "C:\vcap\data\win_dea\db\db\applications.json"'
   mssql_node:
-    databasesondrive: 'dir C:\nagios\data'
-    sqlservermemory: 'typeperf -sc 1 "\process(sqlservr)\working set - private" & echo done'
-    nodeprocessmemory: 'typeperf -sc 1 "\process(mssqlnode)\working set - private" & echo done'
+    databasesondrive: 'dir C:\vcap\store\mssql\data'
+    sqlservermemory: 'typeperf -sc 1 "\process(sqlservr)\working set - private"'
+    nodeprocessmemory: 'typeperf -sc 1 "\process(mssqlnode)\working set - private"'
     config: 'type "C:\vcap\packages\mssql_node\uhuru.config"'
-    servicedb: 'type "C:\vcap\packages\mssql_node\localDb.xml"'
+    servicedb: 'type "C:\vcap\store\mssql_node.xml"'
   uhurufs_node:
-    datafolders: 'dir C:\nagios\data'
+    datafolders: 'dir C:\vcap\store\uhurufs'
     iiswebsitecount: '%systemroot%\system32\inetsrv\appcmd list app'
-    config: 'type "C:\vcap\packages\uhurufs_node\uhuru.config" & echo done'
-    nodeprocessmemory: 'typeperf -sc 1 "\process(fileservicenode)\working set - private" & echo done'
-    servicedb: 'type "C:\vcap\packages\uhurufs_node\localDb.xml"'
+    config: 'type "C:\vcap\packages\uhurufs_node\uhuru.config"'
+    nodeprocessmemory: 'typeperf -sc 1 "\process(fileservicenode)\working set - private"'
+    servicedb: 'type "C:\vcap\store\uhurufs_node.xml"'
   uhuru_tunnel:
     dropletcountfolder: 'dir C:\vcap\data\win_dea\db\apps'
     workerprocesses: 'tasklist'
