@@ -56,6 +56,10 @@ module Bosh::Deployer
         @properties["ntp"] = Config.spec_properties["ntp"]
       end
 
+      if Config.spec_properties.has_key?("nats")
+        @properties["nats"] = Config.spec_properties["nats"]
+      end
+
       if Config.spec_properties.has_key?("nagios")
         @properties["nagios"] = Config.spec_properties["nagios"]
       end
