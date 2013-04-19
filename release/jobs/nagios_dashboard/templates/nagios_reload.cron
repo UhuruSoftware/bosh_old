@@ -1,1 +1,1 @@
-*/5 * * * * sudo -u vcap /var/vcap/jobs/nagios_dashboard/bin/nagios_reload.sh
+*/15 * * * * sudo -u vcap /var/vcap/jobs/nagios_dashboard/bin/nagios_reload.sh
