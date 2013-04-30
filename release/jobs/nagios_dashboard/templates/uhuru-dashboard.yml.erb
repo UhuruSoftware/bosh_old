@@ -54,6 +54,7 @@ windows:
     cpu_time: 'typeperf -sc 1 "\processor(_total)\% processor time"'
     system_info: 'systeminfo'
     disk_usage_c: 'fsutil volume diskfree c:'
+    disk_usage_data: 'fsutil volume diskfree c:\vcap\data'
     license_info: 'cscript c:\windows\system32\slmgr.vbs -dli'
   win_dea:
     dropletcountfolder: 'dir C:\vcap\data\win_dea\db\apps'
@@ -68,12 +69,14 @@ windows:
     nodeprocessmemory: 'typeperf -sc 1 "\process(mssqlnode)\working set - private"'
     config: 'type "C:\vcap\packages\mssql_node\uhuru.config"'
     servicedb: 'type "C:\vcap\store\mssql_node.xml"'
+    disk_usage_store: 'fsutil volume diskfree c:\vcap\store'
   uhurufs_node:
     datafolders: 'dir C:\vcap\store\uhurufs'
     iiswebsitecount: '%systemroot%\system32\inetsrv\appcmd list app'
     config: 'type "C:\vcap\packages\uhurufs_node\uhuru.config"'
     nodeprocessmemory: 'typeperf -sc 1 "\process(fileservicenode)\working set - private"'
     servicedb: 'type "C:\vcap\store\uhurufs_node.xml"'
+    disk_usage_store: 'fsutil volume diskfree c:\vcap\store'
   uhuru_tunnel:
     dropletcountfolder: 'dir C:\vcap\data\win_dea\db\apps'
     workerprocesses: 'tasklist'
