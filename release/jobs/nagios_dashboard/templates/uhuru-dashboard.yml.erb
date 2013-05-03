@@ -61,7 +61,7 @@ windows:
     workerprocesses: 'tasklist'
     deaprocessmemory: 'typeperf -sc 1 "\process(dea)\working set - private"'
     iiswebsitecount: '%systemroot%\system32\inetsrv\appcmd list app'
-    config: 'type "C:\vcap\packages\win_dea\uhuru.config"'
+    config: 'type "C:\vcap\packages\win_dea\DEA.config"'
     dropletdata: 'type "C:\vcap\data\win_dea\db\db\applications.json"'
   mssql_node:
     databasesondrive: 'dir C:\vcap\store\mssql\data'
@@ -82,7 +82,7 @@ windows:
     workerprocesses: 'tasklist'
     deaprocessmemory: 'typeperf -sc 1 "\process(dea)\working set - private"'
     iiswebsitecount: '%systemroot%\system32\inetsrv\appcmd list app'
-    config: 'type "C:\vcap\packages\win_dea\uhuru.config"'
+    config: 'type "C:\vcap\packages\win_dea\DEA.config"'
     dropletdata: 'type "C:\vcap\data\win_dea\db\db\applications.json"'
 
 linux:
