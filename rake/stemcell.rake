@@ -4,11 +4,61 @@ require "bosh_agent"
 require "rbconfig"
 require "atmos"
 require "json"
+require "rugged"
+
+# microBOSH version should reflect the version of all the BOSH components, not just the agent.
+def micro_version
+  @micro_version ||= File.read("#{File.expand_path('../../', __FILE__)}/BOSH_VERSION").strip
+end
 
 namespace :stemcell do
 
+  def changes_in_bosh_agent?
+    gem_components_changed?('bosh_agent') || component_changed?('stemcell_builder')
+  end
+
+  def changes_in_microbosh?
+    microbosh_components = COMPONENTS - %w(bosh_aws_bootstrap bosh_cli bosh_deployer)
+    components_changed = microbosh_components.inject(false) do |changes, component|
+      changes || gem_components_changed?(component)
+    end
+    components_changed || component_changed?('stemcell_builder')
+  end
+
+  def diff
+    @diff ||= changed_components
+  end
+
+  def changed_components(new_commit_sha=ENV['GIT_COMMIT'], old_commit_sha=ENV['GIT_PREVIOUS_COMMIT'])
+    repo = Rugged::Repository.new('.')
+    old_trees = old_commit_sha ? repo.lookup(old_commit_sha).tree.to_a : []
+    new_trees = repo.lookup(new_commit_sha || repo.head.target).tree.to_a
+    (new_trees - old_trees).map { |entry| entry[:name] }
+  end
+
+  def component_changed?(path)
+    diff.include?(path)
+  end
+
+  def gem_components_changed?(gem_name)
+    gem = Gem::Specification.load(File.join(gem_name, "#{gem_name}.gemspec"))
+
+    components = %w(Gemfile Gemfile.lock) +
+        [gem_name] +
+        gem.runtime_dependencies.map {|d| d.name }.select {|d| Dir.exists?(d)}
+
+    components.inject(false) do |changes, component|
+      changes || component_changed?(component)
+    end
+  end
+
+
   desc "Build stemcell"
-  task :basic, [:infrastructure] => "all:finalize_release_directory"  do |t, args|
+  task :basic, [:infrastructure] => 'all:finalize_release_directory' do |t, args|
+    unless changes_in_bosh_agent?
+      puts 'No changes detected in bosh_agent or stemcell_builder...skipping stemcell creation.'
+      next
+    end
     options = default_options(args)
     options[:stemcell_name] ||= "bosh-stemcell"
     options[:stemcell_version] ||= Bosh::Agent::VERSION
@@ -28,13 +78,25 @@ namespace :stemcell do
   end
 
   desc "Build micro bosh stemcell"
-  task :micro, [:infrastructure] => "all:finalize_release_directory" do |t, args|
-    release_tarball = build_micro_bosh_release
-    manifest = File.join(File.expand_path(File.dirname(__FILE__)), "..", "release", "micro","#{args[:infrastructure]}.yml")
+  task :micro, [:infrastructure, :tarball] do |t, args|
+    manifest = File.join(File.expand_path(File.dirname(__FILE__)), "..",
+                         "release", "micro","#{args[:infrastructure]}.yml")
+
+    if args[:tarball]
+      release_tarball = args[:tarball]
+    else
+      unless changes_in_microbosh?
+        puts 'No changes detected in microbosh components or stemcell_builder...skipping stemcell creation.'
+        next
+      end
+
+      Rake::Task['all:finalize_release_directory'].invoke
+      release_tarball = build_micro_bosh_release
+    end
 
     options = default_options(args)
     options[:stemcell_name] ||= "micro-bosh-stemcell"
-    options[:stemcell_version] ||= "0.8.1"
+    options[:stemcell_version] ||= micro_version
     options[:image_create_disk_size] = 2048
 
     options = options.merge(bosh_micro_options(manifest, release_tarball))
@@ -59,59 +121,6 @@ namespace :stemcell do
     options[:micro_src] = args[:micro_src]
 
     build("stemcell-mcf", options)
-  end
-
-
-  namespace :aws do
-    require "aws-sdk"
-
-    task :publish_to_s3, [:stemcell_tgz, :bucket_name] do |t,args|
-      light_stemcell_tgz = args[:stemcell_tgz]
-      bucket_name = args[:bucket_name]
-      AWS.config({
-          access_key_id: ENV['AWS_ACCESS_KEY_ID_FOR_STEMCELLS_JENKINS_ACCOUNT'],
-          secret_access_key:  ENV['AWS_SECRET_ACCESS_KEY_FOR_STEMCELLS_JENKINS_ACCOUNT']
-      })
-
-      Dir.mktmpdir do |dir|
-        stemcell_tgz = File.dirname(light_stemcell_tgz) + "/" + File.basename(light_stemcell_tgz).gsub('light-','')
-
-        %x{tar xzf #{light_stemcell_tgz} --directory=#{dir} stemcell.MF} || raise("Failed to untar stemcell")
-        stemcell_manifest = "#{dir}/stemcell.MF"
-        stemcell_properties = YAML.load_file(stemcell_manifest)
-        ami_id = stemcell_properties['cloud_properties']['ami']['us-east-1']
-
-        s3 = AWS::S3.new
-        s3.buckets.create(bucket_name)    # doesn't fail if already exists in your account
-        bucket = s3.buckets[bucket_name]
-
-        obj = bucket.objects["last_successful_#{stemcell_properties["name"]}_ami"]
-        obj.write(ami_id)
-        obj.acl = :public_read
-        puts "AMI name written to: #{obj.public_url :secure => false}"
-
-        obj = bucket.objects["last_successful_#{stemcell_properties["name"]}_light.tgz"]
-        obj.write(:file => light_stemcell_tgz)
-        obj.acl = :public_read
-        puts "Lite stemcell written to: #{obj.public_url :secure => false}"
-
-        obj = bucket.objects["last_successful_#{stemcell_properties["name"]}.tgz"]
-        obj.write(:file => stemcell_tgz)
-        obj.acl = :public_read
-        puts "Stemcell written to: #{obj.public_url :secure => false}"
-      end
-
-    end
-  end
-
-  def build_micro_bosh_release
-    release_tarball = nil
-    Dir.chdir('release') do
-      sh('cp config/microbosh-dev-template.yml config/dev.yml')
-      sh('bosh create release --force --with-tarball')
-      release_tarball = `ls -1t dev_releases/micro-bosh*.tgz | head -1`
-    end
-    File.join(File.expand_path(File.dirname(__FILE__)), "..", "release", release_tarball)
   end
 
   def default_options(args)
@@ -199,7 +208,10 @@ namespace :stemcell do
 
     build_path = File.join(root, "build")
 
-    cp_r File.expand_path("../../stemcell_builder", __FILE__), build_path, :preserve => true
+    rm_rf "#{build_path}"
+    mkdir_p build_path
+    stemcell_build_dir = File.expand_path("../../stemcell_builder", __FILE__)
+    cp_r Dir.glob("#{stemcell_build_dir}/*"), build_path, :preserve => true
 
     work_path = ENV["WORK_PATH"] || File.join(root, "work")
     mkdir_p work_path
@@ -258,7 +270,7 @@ namespace :stemcell do
       unless File.exists?("#{INDEX_FILE_DIR}/public_stemcell_config.yml")
         raise "#{INDEX_FILE_DIR}/public_stemcell_config.yml does not exist."
       end
-      cfg = YAML.load_file("#{INDEX_FILE_DIR}/public_stemcell_config.yml")
+      cfg = Psych.load_file("#{INDEX_FILE_DIR}/public_stemcell_config.yml")
       [cfg["stemcells_index_id"], cfg["atmos_url"], cfg["expiration"],
        cfg["uid"], cfg["secret"]]
     end
@@ -269,7 +281,7 @@ namespace :stemcell do
     # @return [Array] An array of the index file and it's YAML as a Hash.
     def get_index_file(store, stemcells_index_id)
       index_file = store.get(:id => decode_object_id(stemcells_index_id)["oid"])
-      index_yaml = YAML.load(index_file.data)
+      index_yaml = Psych.load(index_file.data)
       index_yaml = index_yaml.is_a?(Hash) ? index_yaml : {}
       [index_file, index_yaml]
     end
@@ -293,7 +305,7 @@ namespace :stemcell do
     # @param [String] url The new URL.
     def update_index_file(stemcell_index, yaml, url)
       yaml = change_all_urls(yaml, url)
-      yaml_dump = YAML.dump(yaml)
+      yaml_dump = Psych.dump(yaml)
 
       File.open("#{INDEX_FILE_DIR}/#{INDEX_FILE_NAME}", "w") do |f|
         f.write(yaml_dump)
@@ -487,7 +499,7 @@ namespace :stemcell do
       index_file, index_yaml = get_index_file(store, stemcells_index_id)
 
       File.open("#{INDEX_FILE_DIR}/#{INDEX_FILE_NAME}", "w") do |f|
-        f.write(YAML.dump(index_yaml))
+        f.write(Psych.dump(index_yaml))
       end
 
       puts("Downloaded to #{INDEX_FILE_DIR}/#{INDEX_FILE_NAME}.")
@@ -497,7 +509,7 @@ namespace :stemcell do
     task "upload_index_file" do
       if agree("Are you sure you want to upload your " +
                    "public_stemcell_config.yml over the existing one?")
-        yaml = YAML.load_file("#{INDEX_FILE_DIR}/#{INDEX_FILE_NAME}")
+        yaml = Psych.load_file("#{INDEX_FILE_DIR}/#{INDEX_FILE_NAME}")
         stemcells_index_id, url, expiration, uid, secret = load_stemcell_config
         store = Atmos::Store.new(:url => url, :uid => uid, :secret => secret)
         index_file, index_yaml = get_index_file(store, stemcells_index_id)

@@ -1,9 +1,26 @@
-COMPONENTS = %w( agent_client bosh_aws_bootstrap bosh_aws_cpi blobstore_client
-                 bosh_agent bosh_cli bosh_common bosh_cpi bosh_deployer director bosh_encryption health_monitor
-                 monit_api bosh_openstack_cpi bosh_registry package_compiler ruby_vcloud_sdk ruby_vim_sdk
-                 simple_blobstore_server bosh_vcloud_cpi bosh_vsphere_cpi)
+COMPONENTS = %w(agent_client
+                blobstore_client
+                bosh_agent
+                bosh_aws_cpi
+                bosh_cli
+                bosh_cli_plugin_aws
+                bosh_cli_plugin_micro
+                bosh_common
+                bosh_cpi
+                bosh_encryption
+                bosh_openstack_cpi
+                bosh_registry
+                bosh_vcloud_cpi
+                bosh_vsphere_cpi
+                director
+                health_monitor
+                monit_api
+                package_compiler
+                ruby_vcloud_sdk
+                ruby_vim_sdk
+                simple_blobstore_server)
 
-COMPONENTS_WITH_PG = %w( director bosh_registry)
+COMPONENTS_WITH_PG = %w(director bosh_registry)
 
 
 def root
@@ -41,6 +58,7 @@ COMPONENTS.each do |component|
 
     task :finalize_release_directory => 'all:stage_with_dependencies' do
       dirname = "#{root}/release/src/bosh/#{component}"
+
       rm_rf dirname
       mkdir_p dirname
       gemfile_lock_path = File.join(root, 'Gemfile.lock')
@@ -59,7 +77,7 @@ COMPONENTS.each do |component|
     end
 
     task :install => :pre_stage_latest do
-      sh "gem install #{gem}"
+      sh "gem install #{gem} --no-ri --no-rdoc"
     end
 
     task :prep_release => [:ensure_clean_state, :pre_stage_latest]

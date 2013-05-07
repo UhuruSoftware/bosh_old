@@ -1,8 +1,8 @@
 # Copyright (c) 2009-2012 VMware, Inc.
 
-require File.expand_path("../../spec_helper", __FILE__)
+require 'spec_helper'
 
-require "rack/test"
+require 'rack/test'
 
 describe Bosh::Director::ApiController do
   include Rack::Test::Methods
@@ -13,7 +13,7 @@ describe Bosh::Director::ApiController do
     FileUtils.mkdir_p(@blobstore_dir)
     FileUtils.mkdir_p(@temp_dir)
 
-    test_config = YAML.load(spec_asset("test-director-config.yml"))
+    test_config = Psych.load(spec_asset("test-director-config.yml"))
     test_config["dir"] = @temp_dir
     test_config["blobstore"] = {
         "provider" => "local",
@@ -150,7 +150,7 @@ describe Bosh::Director::ApiController do
     describe "job management" do
       it "allows putting jobs into different states" do
         BD::Models::Deployment.
-            create(:name => "foo", :manifest => YAML.dump({"foo" => "bar"}))
+            create(:name => "foo", :manifest => Psych.dump({"foo" => "bar"}))
         put "/deployments/foo/jobs/nats?state=stopped", {},
             payload("text/yaml", spec_asset("test_conf.yaml"))
         expect_redirect_to_queued_task(last_response)
@@ -158,7 +158,7 @@ describe Bosh::Director::ApiController do
 
       it "allows putting job instances into different states" do
         BD::Models::Deployment.
-            create(:name => "foo", :manifest => YAML.dump({"foo" => "bar"}))
+            create(:name => "foo", :manifest => Psych.dump({"foo" => "bar"}))
         put "/deployments/foo/jobs/dea/2?state=stopped", {},
             payload("text/yaml", spec_asset("test_conf.yaml"))
         expect_redirect_to_queued_task(last_response)
@@ -169,12 +169,36 @@ describe Bosh::Director::ApiController do
             payload("text/yaml", spec_asset("test_conf.yaml"))
         last_response.status.should == 400
       end
+
+      it 'can get job information' do
+        deployment = BD::Models::Deployment.create(name: "foo", manifest: Psych.dump({"foo" => "bar"}))
+        instance = BD::Models::Instance.create(deployment: deployment, job: "nats", index: "0", state: "started")
+        disk = BD::Models::PersistentDisk.create(instance: instance, disk_cid: 'disk_cid')
+
+        get '/deployments/foo/jobs/nats/0', {}
+
+        last_response.status.should == 200
+        expected = {
+            'deployment' => 'foo',
+            'job' => 'nats',
+            'index' => 0,
+            'state' => 'started',
+            'disks' => %w[disk_cid]
+        }
+
+        Yajl::Parser.parse(last_response.body).should == expected
+      end
+
+      it 'should return 404 if the instance cannot be found' do
+        get '/deployments/foo/jobs/nats/0', {}
+        last_response.status.should == 404
+      end
     end
 
     describe "log management" do
       it "allows fetching logs from a particular instance" do
         deployment = BD::Models::Deployment.
-            create(:name => "foo", :manifest => YAML.dump({"foo" => "bar"}))
+            create(:name => "foo", :manifest => Psych.dump({"foo" => "bar"}))
         instance = BD::Models::Instance.
             create(:deployment => deployment, :job => "nats",
                    :index => "0", :state => "started")
@@ -189,7 +213,7 @@ describe Bosh::Director::ApiController do
 
       it "404 if no deployment" do
         deployment = BD::Models::Deployment.
-            create(:name => "bar", :manifest => YAML.dump({"foo" => "bar"}))
+            create(:name => "bar", :manifest => Psych.dump({"foo" => "bar"}))
         get "/deployments/bar/jobs/nats/0/logs", {}
         last_response.status.should == 404
       end
@@ -313,12 +337,12 @@ describe Bosh::Director::ApiController do
       it "returns manifest" do
         deployment = BD::Models::Deployment.
             create(:name => "test_deployment",
-                   :manifest => YAML.dump({"foo" => "bar"}))
+                   :manifest => Psych.dump({"foo" => "bar"}))
         get "/deployments/test_deployment"
 
         last_response.status.should == 200
         body = Yajl::Parser.parse(last_response.body)
-        YAML.load(body["manifest"]).should == {"foo" => "bar"}
+        Psych.load(body["manifest"]).should == {"foo" => "bar"}
       end
     end
 
@@ -326,7 +350,7 @@ describe Bosh::Director::ApiController do
       it "returns a list of agent_ids, jobs and indices" do
         deployment = BD::Models::Deployment.
             create(:name => "test_deployment",
-                   :manifest => YAML.dump({"foo" => "bar"}))
+                   :manifest => Psych.dump({"foo" => "bar"}))
         vms = []
 
         15.times do |i|
@@ -675,10 +699,9 @@ describe Bosh::Director::ApiController do
     end
 
     describe "problem management" do
+      let!(:deployment) { BD::Models::Deployment.make(:name => "mycloud") }
 
       it "exposes problem managent REST API" do
-        deployment = BD::Models::Deployment.make(:name => "mycloud")
-
         get "/deployments/mycloud/problems"
         last_response.status.should == 200
         Yajl::Parser.parse(last_response.body).should == []
@@ -698,6 +721,59 @@ describe Bosh::Director::ApiController do
         put "/deployments/mycloud/problems", {},
             payload("application/json", :solution => "default")
         expect_redirect_to_queued_task(last_response)
+      end
+
+      it 'scans and fixes problems' do
+        put '/deployments/mycloud/scan_and_fix', {}, payload("application/json", 'job' => [0])
+        expect_redirect_to_queued_task(last_response)
+      end
+    end
+
+    describe 'snapshots' do
+      before do
+        deployment = BD::Models::Deployment.make(name: "mycloud")
+
+        instance = BD::Models::Instance.make(deployment: deployment, job: 'job', index: 0)
+        disk = BD::Models::PersistentDisk.make(disk_cid: 'disk0', instance: instance, active: true)
+        BD::Models::Snapshot.make(persistent_disk: disk, snapshot_cid: 'snap0a')
+
+        instance = BD::Models::Instance.make(deployment: deployment, job: 'job', index: 1)
+        disk = BD::Models::PersistentDisk.make(disk_cid: 'disk1', instance: instance, active: true)
+        BD::Models::Snapshot.make(persistent_disk: disk, snapshot_cid: 'snap1a')
+        BD::Models::Snapshot.make(persistent_disk: disk, snapshot_cid: 'snap1b')
+
+      end
+
+      describe 'creating' do
+        it 'should create a snapshot' do
+          post '/deployments/mycloud/jobs/job/1/snapshots'
+          expect_redirect_to_queued_task(last_response)
+        end
+      end
+
+      describe 'deleting' do
+        it 'should delete a snapshot' do
+          delete '/deployments/mycloud/snapshots/snap1a'
+          expect_redirect_to_queued_task(last_response)
+        end
+
+        it 'should raise an error if the snapshot belongs to a different deployment' do
+          snap = BD::Models::Snapshot.make(snapshot_cid: 'snap2b')
+          delete "/deployments/#{snap.persistent_disk.instance.deployment.name}/snapshots/snap2a"
+          last_response.status.should == 400
+        end
+      end
+
+      describe 'listing' do
+        it 'should list all snapshots for a job' do
+          get '/deployments/mycloud/jobs/job/0/snapshots'
+          last_response.status.should == 200
+        end
+
+        it 'should list all snapshots for a deployment' do
+          get '/deployments/mycloud/snapshots'
+          last_response.status.should == 200
+        end
       end
     end
 

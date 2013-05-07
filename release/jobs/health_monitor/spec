@@ -135,10 +135,24 @@ properties:
 
   # Send events via /varz endpoint
   hm.varz_enabled:
-    description: Enable /varz plugin
+    description: Enable varz plugin
     default: false
 
   # Send metrics to AWS CloudWatch
   hm.cloud_watch_enabled:
     description: Enable AWS CloudWatch Plugin
     default: false
+
+  # Automatically recreate VMs on which the agent is no longer responsive
+  hm.resurrector_enabled:
+    description: Enable VM resurrector plugin
+    default: false
+
+  # Send metrics and alerts to DataDog
+  hm.datadog_enabled:
+    description: Enable DataDog plugin
+    default: false
+  hm.datadog.api_key:
+    description: API Key for DataDog
+  hm.datadog.application_key:
+    description: Health Monitor Application Key for DataDog

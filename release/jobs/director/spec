@@ -9,8 +9,14 @@ templates:
   stemcell-copy.sh: bin/stemcell-copy
   task_logrotate.sh: bin/task_logrotate
   task_logrotate.cron: config/task_logrotate.cron
+  director.pem.erb: config/ssl/director.pem
+  director.key.erb: config/ssl/director.key
+  nginx.conf.erb: config/nginx.conf
+  nginx_ctl: bin/nginx_ctl
+  mime.types: config/mime.types
 packages:
 - director
+- nginx
 - genisoimage
 - libpq
 - ruby
@@ -19,8 +25,24 @@ properties:
   director.name:
     description: Name of the director
   director.port:
-    description: Port that the dirctor listens on
+    description: Port that the director nginx listens on
     default: 25555
+  director.backend_port:
+    description: Port that the director listens on
+    default: 25556
+  director.nginx.workers:
+    default: 2
+    description: Number of nginx workers for director
+  director.timeout:
+    default: 7200
+    description: Timeout for nginx
+  director.max_upload_size:
+    default: 5000m
+    description: Max allowed file size for upload
+  director.ssl.cert:
+    description: SSL Certificate for director (PEM encoded)
+  director.ssl.key:
+    description: SSL private key for director (PEM encoded)
   director.encryption:
     description: Enable/Disable agent-director encryption (true|false)
     default: false
@@ -37,6 +59,9 @@ properties:
     default: 25255
   redis.password:
     description: Password of the redis server
+  redis.loglevel:
+    description: Level of log messages for Redis connections (fatal, error, warn, info, debug)
+    default: info
   nats.user:
     description: Username to connect to nats with
     default: nats
@@ -93,15 +118,15 @@ properties:
     description: Username agent uses to connect to blobstore used by simple blobstore plugin
   blobstore.agent.password:
     description: Password agent uses to connect to blobstore used by simple blobstore plugin
-  compiled_package_cache.plugin:
-      description: Plugin of the blobstore used for the compiled package cache
-  default: 's3'
-  compiled_package_cache.bucket_name:
-      description: AWS S3 Bucket used for the compiled package cache
-  compiled_package_cache.access_key_id:
-      description: AWS access_key_id used for the compiled package cache
-  compiled_package_cache.secret_access_key:
-      description: AWS secret_access_key used for the compiled package cache
+  compiled_package_cache.provider:
+    description: Provider of the blobstore used for the compiled package cache
+    default: 's3'
+  compiled_package_cache.options.bucket_name:
+    description: AWS S3 Bucket used for the compiled package cache
+  compiled_package_cache.options.access_key_id:
+    description: AWS access_key_id used for the compiled package cache
+  compiled_package_cache.options.secret_access_key:
+    description: AWS secret_access_key used for the compiled package cache
   ntp:
     description: List of ntp server IPs
     default: []

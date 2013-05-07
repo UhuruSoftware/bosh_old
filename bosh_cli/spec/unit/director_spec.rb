@@ -4,13 +4,22 @@ require "spec_helper"
 
 describe Bosh::Cli::Director do
 
-  DUMMY_TARGET = "http://target.example.com:8080"
+  DUMMY_TARGET = "https://target.example.com:8080"
 
   before do
     URI.should_receive(:parse).with(DUMMY_TARGET).and_call_original
     Resolv.should_receive(:getaddresses).with("target.example.com").and_return(["127.0.0.1"])
     @director = Bosh::Cli::Director.new(DUMMY_TARGET, "user", "pass")
     @director.stub(retry_wait_interval: 0)
+  end
+
+  describe "checking availability" do
+    it "waits until director is ready" do
+      @director.should_receive(:get_status).and_raise(Bosh::Cli::DirectorError)
+      @director.should_receive(:get_status).and_return(cpi: 'aws')
+
+      @director.wait_until_ready
+    end
   end
 
   describe "fetching status" do
@@ -60,6 +69,20 @@ describe Bosh::Cli::Director do
              JSON.generate("username" => "joe", "password" => "pass")).
         and_return(true)
       @director.create_user("joe", "pass")
+    end
+
+    it "deletes users" do
+      @director.should_receive(:delete).
+        with("/users/joe").
+        and_return([204, "", {}])
+      @director.delete_user("joe").should == true
+    end
+
+    it "fails to delete users" do
+      @director.should_receive(:delete).
+        with("/users/joe").
+        and_return([500, "", {}])
+      @director.delete_user("joe").should == false
     end
 
     it "uploads stemcell" do
@@ -271,12 +294,33 @@ describe Bosh::Cli::Director do
   end
 
   describe "tracking request" do
-    it "starts polling task if request responded with a redirect to task URL" do
+    it "starts polling task if request responded with a redirect (302) to task URL" do
       options = { :arg1 => 1, :arg2 => 2 }
 
       @director.should_receive(:request).
         with(:get, "/stuff", "text/plain", "abc").
         and_return([302, "body", { :location => "/tasks/502" }])
+
+      tracker = mock("tracker", :track => "polling result", :output => "foo")
+
+      Bosh::Cli::TaskTracker.should_receive(:new).
+        with(@director, "502", options).
+        and_return(tracker)
+
+      @director.request_and_track(:get, "/stuff",
+                                  {:content_type => "text/plain",
+                                   :payload => "abc",
+                                   :arg1 => 1, :arg2 => 2
+                                  }).
+        should == ["polling result", "502"]
+    end
+
+    it "starts polling task if request responded with a redirect (303) to task URL" do
+      options = { :arg1 => 1, :arg2 => 2 }
+
+      @director.should_receive(:request).
+        with(:get, "/stuff", "text/plain", "abc").
+        and_return([303, "body", { :location => "/tasks/502" }])
 
       tracker = mock("tracker", :track => "polling result", :output => "foo")
 
@@ -319,7 +363,7 @@ describe Bosh::Cli::Director do
       end
     end
 
-    it "considers all responses but 302 a failure" do
+    it "considers all responses but 302 and 303 a failure" do
       [200, 404, 403].each do |code|
         @director.should_receive(:request).
           with(:get, "/stuff", "text/plain", "abc").
@@ -366,14 +410,19 @@ describe Bosh::Cli::Director do
       password = "pass"
       auth = "Basic " + Base64.encode64("#{user}:#{password}").strip
 
-      client = mock("httpclient")
+      ssl_config = stub("ssl_config")
+      ssl_config.should_receive(:verify_mode=).
+          with(OpenSSL::SSL::VERIFY_NONE)
+      ssl_config.should_receive(:verify_callback=)
+
+      client = mock("httpclient", :ssl_config => ssl_config)
       client.should_receive(:send_timeout=).
         with(Bosh::Cli::Director::API_TIMEOUT)
       client.should_receive(:receive_timeout=).
         with(Bosh::Cli::Director::API_TIMEOUT)
       client.should_receive(:connect_timeout=).
         with(Bosh::Cli::Director::CONNECT_TIMEOUT)
-      URI.should_receive(:parse).with("http://nil-uri-given/").and_call_original
+
       HTTPClient.stub!(:new).and_return(client)
 
       client.should_receive(:request).
@@ -390,7 +439,7 @@ describe Bosh::Cli::Director do
                            :body => "test", :headers => {})
 
       @director.should_receive(:perform_http_request).
-        with(:get, "http://127.0.0.1:8080/stuff", "payload", "h1" => "a",
+        with(:get, "https://127.0.0.1:8080/stuff", "payload", "h1" => "a",
              "h2" => "b", "Content-Type" => "app/zb").
         and_return(mock_response)
 

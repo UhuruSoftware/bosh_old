@@ -30,6 +30,7 @@ require "bosh_agent/template"
 require "bosh_agent/errors"
 require "bosh_agent/remote_exception"
 
+require "bosh_agent/sigar_box"
 require "bosh_agent/config"
 require "bosh_agent/util"
 require "bosh_agent/monit"
@@ -67,8 +68,6 @@ require "bosh_agent/message/ssh"
 
 require "bosh_agent/handler"
 
-YAML::ENGINE.yamler = 'syck' if defined?(YAML::ENGINE.yamler)
-
 module Bosh::Agent
 
   BOSH_APP = BOSH_APP_USER = BOSH_APP_GROUP = "vcap"
@@ -105,7 +104,8 @@ module Bosh::Agent
         @logger.info("Skipping configuration step (use '-c' argument to configure on start) ")
       end
 
-      if Config.mbus.start_with?("http")
+      if Config.mbus.start_with?("https")
+        @logger.info("Starting up https agent")
         require "bosh_agent/http_handler"
         Bosh::Agent::HTTPHandler.start
       else

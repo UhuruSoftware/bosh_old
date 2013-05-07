@@ -61,11 +61,12 @@ def mock_cloud(options = nil)
   volumes = double("volumes")
   addresses = double("addresses")
   snapshots = double("snapshots")
+  key_pairs = double("key_pairs")
 
-  glance = double(Bosh::OpenStackCloud::Connection, :service => :image)
+  glance = double(Fog::Image)
   Fog::Image.stub(:new).and_return(glance)
 
-  openstack = double(Bosh::OpenStackCloud::Connection, :service => :compute)
+  openstack = double(Fog::Compute)
 
   openstack.stub(:servers).and_return(servers)
   openstack.stub(:images).and_return(images)
@@ -73,6 +74,7 @@ def mock_cloud(options = nil)
   openstack.stub(:volumes).and_return(volumes)
   openstack.stub(:addresses).and_return(addresses)
   openstack.stub(:snapshots).and_return(snapshots)
+  openstack.stub(:key_pairs).and_return(key_pairs)
 
   Fog::Compute.stub(:new).and_return(openstack)
 
@@ -84,10 +86,10 @@ end
 def mock_glance(options = nil)
   images = double("images")
 
-  openstack = double(Bosh::OpenStackCloud::Connection, :service => :compute)
+  openstack = double(Fog::Compute)
   Fog::Compute.stub(:new).and_return(openstack)
 
-  glance = double(Bosh::OpenStackCloud::Connection, :service => :image)
+  glance = double(Fog::Image)
   glance.stub(:images).and_return(images)
 
   Fog::Image.stub(:new).and_return(glance)

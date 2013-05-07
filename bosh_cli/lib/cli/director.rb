@@ -33,6 +33,8 @@ module Bosh
         @user = user
         @password = password
         @track_tasks = !options.delete(:no_track)
+        @num_retries = options.fetch(:num_retries, 5)
+        @retry_wait_interval = options.fetch(:retry_wait_interval, 5)
       end
 
       def uuid
@@ -48,6 +50,13 @@ module Bosh
         false
       end
 
+      def wait_until_ready
+        num_retries.times do
+          return if exists?
+          sleep retry_wait_interval
+        end
+      end
+
       def authenticated?
         status = get_status
         # Backward compatibility: older directors return 200
@@ -61,6 +70,11 @@ module Bosh
       def create_user(username, password)
         payload = JSON.generate("username" => username, "password" => password)
         response_code, _ = post("/users", "application/json", payload)
+        response_code == 204
+      end
+
+      def delete_user(username)
+        response_code, _ = delete("/users/#{username}")
         response_code == 204
       end
 
@@ -120,12 +134,12 @@ module Bosh
       end
 
       def get_deployment(name)
-        status, body = get_json_with_status("/deployments/#{name}")
+        _, body = get_json_with_status("/deployments/#{name}")
         body
       end
 
       def list_vms(name)
-        status, body = get_json_with_status("/deployments/#{name}/vms")
+        _, body = get_json_with_status("/deployments/#{name}/vms")
         body
       end
 
@@ -456,7 +470,7 @@ module Bosh
 
         http_status, _, headers = request(method, uri, content_type, payload)
         location = headers[:location]
-        redirected = http_status == 302
+        redirected = [302, 303].include? http_status
         task_id = nil
 
         if redirected
@@ -552,6 +566,9 @@ module Bosh
         http_client.receive_timeout = API_TIMEOUT
         http_client.connect_timeout = CONNECT_TIMEOUT
 
+        http_client.ssl_config.verify_mode = OpenSSL::SSL::VERIFY_NONE
+        http_client.ssl_config.verify_callback = Proc.new {}
+
         # HTTPClient#set_auth doesn't seem to work properly,
         # injecting header manually instead.
         # TODO: consider using vanilla Net::HTTP
@@ -607,9 +624,7 @@ module Bosh
         end
       end
 
-      def num_retries; 5; end
-
-      def retry_wait_interval; 5; end
+      attr_reader :num_retries, :retry_wait_interval
     end
 
     class FileWithProgressBar < ::File

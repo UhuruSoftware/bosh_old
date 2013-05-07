@@ -8,6 +8,7 @@ module Bosh::AwsCloud
     # default maximum number of times to retry an AWS API call
     DEFAULT_MAX_RETRIES = 2
     DEFAULT_EC2_ENDPOINT = "ec2.amazonaws.com"
+    DEFAULT_ELB_ENDPOINT = "elasticloadbalancing.amazonaws.com"
     METADATA_TIMEOUT = 5 # in seconds
     DEVICE_POLL_TIMEOUT = 60 # in seconds
 
@@ -43,6 +44,7 @@ module Bosh::AwsCloud
           :access_key_id => @aws_properties["access_key_id"],
           :secret_access_key => @aws_properties["secret_access_key"],
           :ec2_endpoint => @aws_properties["ec2_endpoint"] || default_ec2_endpoint,
+          :elb_endpoint => @aws_properties["elb_endpoint"] || default_elb_endpoint,
           :max_retries => @aws_properties["max_retries"] || DEFAULT_MAX_RETRIES,
           :logger => @aws_logger
       }
@@ -218,8 +220,13 @@ module Bosh::AwsCloud
         end
 
         if @fast_path_delete
-          TagManager.tag(volume, "Name", "to be deleted")
-          @logger.info("Volume `#{disk_id}' has been marked for deletion")
+          begin
+            TagManager.tag(volume, "Name", "to be deleted")
+            @logger.info("Volume `#{disk_id}' has been marked for deletion")
+          rescue AWS::EC2::Errors::InvalidVolume::NotFound
+            # Once in a blue moon AWS if actually fast enough that the volume is already gone
+            # when we get here, and if it is, our work here is done!
+          end
           return
         end
 
@@ -265,6 +272,37 @@ module Bosh::AwsCloud
         detach_ebs_volume(instance, volume)
 
         @logger.info("Detached `#{disk_id}' from `#{instance_id}'")
+      end
+    end
+
+    # Take snapshot of disk
+    # @param [String] disk_id disk id of the disk to take the snapshot of
+    # @return [String] snapshot id
+    def snapshot_disk(disk_id)
+      with_thread_name("snapshot_disk(#{disk_id})") do
+        volume = @ec2.volumes[disk_id]
+        snapshot = volume.create_snapshot
+        @logger.info("snapshot '#{snapshot.id}' of volume '#{disk_id}' created")
+        snapshot.id
+      end
+    end
+
+    # Delete a disk snapshot
+    # @param [String] snapshot_id snapshot id to delete
+    def delete_snapshot(snapshot_id)
+      with_thread_name("delete_snapshot(#{snapshot_id})") do
+        snapshot = @ec2.snapshots[snapshot_id]
+
+        if snapshot.status == :in_use
+          raise Bosh::Clouds::CloudError, "snapshot '#{snapshot.id}' can not be deleted as it is in use"
+        end
+
+        # loop and wait until available before deleting, in case the snapshot isn't
+        # completed yet, as we don't wait when we take the snapshot
+        ResourceWait.for_snapshot(snapshot: snapshot, state: :completed)
+
+        snapshot.delete
+        @logger.info("snapshot '#{snapshot_id}' deleted")
       end
     end
 
@@ -433,7 +471,7 @@ module Bosh::AwsCloud
         client.connect_timeout = METADATA_TIMEOUT
         # Using 169.254.169.254 is an EC2 convention for getting
         # instance metadata
-        uri = "http://169.254.169.254/1.0/meta-data/instance-id/"
+        uri = "http://169.254.169.254/latest/meta-data/instance-id/"
 
         response = client.get(uri)
         unless response.status == 200
@@ -462,7 +500,7 @@ module Bosh::AwsCloud
           next
         end
         # work around AWS eventual (in)consistency
-        Bosh::Common.retryable(tries: 10, on: AWS::EC2::Errors::IncorrectState) do
+        Bosh::Common.retryable(tries: 15, on: AWS::EC2::Errors::IncorrectState) do
           new_attachment = volume.attach_to(instance, dev_name)
         end
         break
@@ -493,8 +531,8 @@ module Bosh::AwsCloud
       end
 
       if device_map[volume.id].nil?
-        cloud_error("Disk `#{volume.id}' is not attached " \
-                    "to instance `#{instance.id}'")
+        raise Bosh::Clouds::DiskNotAttached.new(true),
+              "Disk `#{volume.id}' is not attached to instance `#{instance.id}'"
       end
 
       attachment = volume.detach_from(instance, device_map[volume.id], force: force)
@@ -531,6 +569,14 @@ module Bosh::AwsCloud
         "ec2.#{@aws_region}.amazonaws.com"
       else
         DEFAULT_EC2_ENDPOINT
+      end
+    end
+
+    def default_elb_endpoint
+      if @aws_region
+        "elasticloadbalancing.#{@aws_region}.amazonaws.com"
+      else
+        DEFAULT_ELB_ENDPOINT
       end
     end
 

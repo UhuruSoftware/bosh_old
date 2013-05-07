@@ -137,6 +137,7 @@ describe "with release and stemcell and two deployments" do
 
     it "should do two deployments from one release" do
       pending "This fails on AWS VPC because use_static_ip only sets the eip but doesn't prevent collision" if aws?
+      pending "This fails on OpenStack because use_static_ip only sets the floating IP but doesn't prevent collision" if openstack?
 
       @first_deployment_result.should succeed_with deployed_regexp
 
@@ -157,8 +158,8 @@ describe "with release and stemcell and two deployments" do
 
     it "should deploy using a static network", ssh: true do
       pending "doesn't work on AWS as the VIP IP isn't visible to the VM" if aws?
-      ssh(static_ip, "vcap", "ifconfig eth0", ssh_options).should
-      match /#{static_ip}/
+      pending "doesn't work on OpenStack as the VIP IP isn't visible to the VM" if openstack?
+      ssh(static_ip, "vcap", "ifconfig eth0", ssh_options).should match /#{static_ip}/
     end
 
     it "should create a disk" do

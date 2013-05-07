@@ -29,7 +29,7 @@ Gem::Specification.new do |s|
   s.add_dependency  "bosh_vcloud_cpi", "~>#{version}"
   s.add_dependency  "bosh_vsphere_cpi", "~>#{version}"
   s.add_dependency  "eventmachine", "~>0.12.9"
-  s.add_dependency  "fog", "~> 1.10.0"
+  s.add_dependency  "fog", "~> 1.10.1"
   s.add_dependency  "httpclient", "=2.2.4"
   s.add_dependency  "nats", "~> 0.4.28"
   s.add_dependency  "netaddr", "~>1.5.0"
@@ -38,12 +38,13 @@ Gem::Specification.new do |s|
   s.add_dependency  "redis", "~>3.0.2"
   s.add_dependency  "resque", "~>1.23.0"
   s.add_dependency  "sequel", "~>3.43.0"
-  s.add_dependency  "sinatra", "~>1.2.8"
+  s.add_dependency  "sinatra", "~>1.4.2"
+  s.add_dependency  'sys-filesystem', "~> 1.1.0"
   s.add_dependency  "thin", "~>1.5.0"
   s.add_dependency  "yajl-ruby", "~>1.1.0"
 
   s.bindir      = 'bin'
-  s.executables << 'console'
+  s.executables << 'director_console'
   s.executables << 'director'
   s.executables << 'drain_workers'
   s.executables << 'worker'

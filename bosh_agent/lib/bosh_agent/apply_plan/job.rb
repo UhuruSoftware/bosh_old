@@ -87,8 +87,8 @@ module Bosh::Agent
         FileUtils.mkdir_p(bin_dir)
 
         begin
-          manifest = YAML.load_file(manifest_path)
-        rescue ArgumentError
+          manifest = Psych.load_file(manifest_path)
+        rescue Psych::SyntaxError
           install_failed("malformed job manifest #{manifest_path}")
         end
 
@@ -119,7 +119,7 @@ module Bosh::Agent
           rescue Exception => e
             # We are essentially running an arbitrary code,
             # hence such a generic rescue clause
-            line_index = e.backtrace.index{ |l| l.include?(src) } || [0]
+            line_index = e.backtrace.index{ |l| l.include?(src) } || 0
             line = e.backtrace[line_index].match(/:(\d+):/).captures.first
             install_failed("failed to process configuration template " +
                            "'#{src}': " +

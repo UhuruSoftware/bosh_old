@@ -1,6 +1,16 @@
 module Bosh::HealthMonitor
   module Events
     class Alert < Base
+
+      # Considering Bosh::Agent::Alert
+      SEVERITY_MAP = {
+        1 => :alert,
+        2 => :critical,
+        3 => :error,
+        4 => :warning,
+        -1 => :ignored
+      }
+
       def initialize(attributes = {})
         super
         @kind = :alert
@@ -8,7 +18,7 @@ module Bosh::HealthMonitor
         @id         = @attributes["id"]
         @severity   = @attributes["severity"]
         @title      = @attributes["title"]
-        @summary    = @attributes["summary"]
+        @summary    = @attributes["summary"] || @title
         @source     = @attributes["source"]
         @created_at = Time.at(@attributes["created_at"]) rescue @attributes["created_at"]
       end
@@ -31,6 +41,10 @@ module Bosh::HealthMonitor
 
       def short_description
         "Severity #{@severity}: #{@source} #{@title}"
+      end
+
+      def severity
+        SEVERITY_MAP[@severity] || @severity
       end
 
       def to_hash
