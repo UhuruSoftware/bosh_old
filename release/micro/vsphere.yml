@@ -13,6 +13,7 @@ jobs:
       - blobstore
       - director
       - health_monitor
+      - nagios_dashboard
 configuration_hash: {}
 properties:
   micro: true
