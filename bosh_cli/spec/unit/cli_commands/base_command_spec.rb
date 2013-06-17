@@ -12,7 +12,7 @@ describe Bosh::Cli::Command::Base do
 
   def add_config(object)
     File.open(@config_file, "w") do |f|
-      f.write(YAML.dump(object))
+      f.write(Psych.dump(object))
     end
   end
 
@@ -23,17 +23,28 @@ describe Bosh::Cli::Command::Base do
   end
 
   it "can access configuration and respects options" do
-    add_config("target" => "localhost:8080", "deployment" => "test")
+    add_config("target" => "localhost:8080", "target_name" => "microbosh", "deployment" => "test")
 
     cmd = make
     cmd.config.should be_a(Bosh::Cli::Config)
 
-    cmd.target.should == "http://localhost:8080"
+    cmd.target.should == "https://localhost:8080"
+    cmd.target_name.should == "microbosh"
     cmd.deployment.should == "test"
     cmd.username.should be_nil
     cmd.password.should be_nil
   end
 
+  it "respects target option" do
+    add_config("target" => "localhost:8080", "target_name" => "microbosh")
+
+    cmd = make
+    cmd.add_option(:target, "new-target")
+
+    cmd.target.should == "https://new-target:25555"
+    cmd.target_name.should == "new-target"
+  end
+  
   it "looks up target, deployment and credentials in the right order" do
     cmd = make
 
@@ -63,7 +74,7 @@ describe Bosh::Cli::Command::Base do
     cmd2 = make
     cmd2.add_option(:target, "foo")
     cmd2.add_option(:deployment, "bar")
-    cmd2.target.should == "http://foo:25555"
+    cmd2.target.should == "https://foo:25555"
     cmd2.deployment.should == "bar"
   end
 
@@ -72,7 +83,7 @@ describe Bosh::Cli::Command::Base do
 
     cmd = make
     cmd.director.should be_kind_of(Bosh::Cli::Director)
-    cmd.director.director_uri.should == URI.parse("http://localhost:8080")
+    cmd.director.director_uri.should == URI.parse("https://localhost:8080")
   end
 
   it "has logged_in? helper" do

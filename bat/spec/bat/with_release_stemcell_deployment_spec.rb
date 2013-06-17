@@ -22,14 +22,14 @@ describe "with release, stemcell and deployment" do
       Dir.mktmpdir do |tmpdir|
         ssh(static_ip, "vcap", "echo #{password} | sudo -S pkill -9 agent", ssh_options)
         # wait for agent to restart
-        sleep(5)
+        wait_for_vm('batlight/0')
         bosh("logs batlight 0 --agent --dir #{tmpdir}")
         # TODO check log for 2 agent starts (first is initial start and second is after crash)
       end
     end
   end
 
-  it "should return vms in a deployment" do
+  xit "should return vms in a deployment" do
     bat_vms = vms(deployment.name)
     bat_vms.size.should == 1
     bat_vms.first.name.should == "batlight/0"
@@ -158,24 +158,6 @@ describe "with release, stemcell and deployment" do
           error.should be_a Bosh::Exec::Error
           error.output.should match /This release version has already been uploaded/
         }
-      end
-    end
-
-    describe "listing" do
-      after do
-        bosh("delete release bosh-release", :on_error => :return)
-      end
-
-      xit "should mark releases that have uncommitted changes" do
-        Dir.chdir(BAT_RELEASE_DIR) do |dir|
-          FileUtils.touch File.join("src/batlight/bin/dirty-file")
-          commit_hash = `git show-ref --head --hash=8 2> /dev/null`.split.first
-          bosh("create release --force")
-          bosh("upload release")
-          FileUtils.rm File.join("src/batlight/bin/dirty-file")
-          bosh("reset release")
-          bosh("releases").should succeed_with /bosh-release.*#{commit_hash}\+.*Uncommitted changes/m
-        end
       end
     end
 

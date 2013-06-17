@@ -9,8 +9,6 @@ module Bosh::Director
 
       # @param [String] stemcell_file Stemcell tarball path
       def initialize(stemcell_file)
-        super
-
         @stemcell_file = stemcell_file
         @cloud = Config.cloud
         @stemcell_manager = Api::StemcellManager.new
@@ -23,17 +21,18 @@ module Bosh::Director
         stemcell_dir = Dir.mktmpdir("stemcell")
 
         track_and_log("Extracting stemcell archive") do
-          output = `tar -C #{stemcell_dir} -xzf #{@stemcell_file} 2>&1`
-          if $?.exitstatus != 0
-            raise StemcellInvalidArchive,
-                  "Invalid stemcell archive, tar returned #{$?.exitstatus}, " +
-                  "output: #{output}"
+          result = Bosh::Exec.sh("tar -C #{stemcell_dir} -xzf #{@stemcell_file} 2>&1", :on_error => :return)
+          if result.failed?
+            logger.error("Extracting stemcell archive failed in dir #{stemcell_dir}, " +
+                         "tar returned #{result.exit_status}, " +
+                         "output: #{result.output}")
+            raise StemcellInvalidArchive, "Extracting stemcell archive failed. Check task debug log for details."
           end
         end
 
         track_and_log("Verifying stemcell manifest") do
           stemcell_manifest_file = File.join(stemcell_dir, "stemcell.MF")
-          stemcell_manifest = YAML.load_file(stemcell_manifest_file)
+          stemcell_manifest = Psych.load_file(stemcell_manifest_file)
 
           @name = safe_property(stemcell_manifest, "name", :class => String)
           @version = safe_property(stemcell_manifest, "version", :class => String)

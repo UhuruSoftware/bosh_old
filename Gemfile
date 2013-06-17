@@ -2,15 +2,17 @@
 
 source 'https://rubygems.org'
 
+ruby '1.9.3'
+
 gem "agent_client", :path => "agent_client"
 gem "blobstore_client", :path => "blobstore_client"
 gem "bosh_agent", :path => "bosh_agent"
-gem "bosh_aws_bootstrap", :path => "bosh_aws_bootstrap"
 gem "bosh_aws_cpi", :path => "bosh_aws_cpi"
 gem "bosh_common", :path => "bosh_common"
 gem "bosh_cpi", :path => "bosh_cpi"
 gem "bosh_cli", :path => "bosh_cli"
-gem "bosh_deployer", :path => "bosh_deployer"
+gem "bosh_cli_plugin_aws", :path => "bosh_cli_plugin_aws"
+gem "bosh_cli_plugin_micro", :path => "bosh_cli_plugin_micro"
 gem "bosh_encryption", :path => "bosh_encryption"
 gem "bosh_openstack_cpi", :path => "bosh_openstack_cpi"
 gem "bosh_registry", :path => "bosh_registry"
@@ -30,6 +32,7 @@ group :production do
   # this was pulled from bosh_aws_registry's Gemfile.  Why does it exist?
   # also bosh_openstack_registry, director
   gem "pg"
+  gem "mysql2"
 end
 
 group :development do
@@ -45,13 +48,16 @@ group :bat do
 end
 
 group :development, :test do
+  gem "parallel_tests"
   gem "rack-test"
   gem "guard"
   gem "guard-bundler"
   gem "guard-rspec"
   gem "ci_reporter"
   gem "rspec"
-
+  gem "tracker-git", github: "cboone/tracker-git", branch: "edge"
+  gem "webmock"
+  gem "fakefs"
   gem "simplecov"
   gem "simplecov-rcov"
 
@@ -62,6 +68,7 @@ group :development, :test do
   gem "rest-client"
   gem "redis"
   gem "nats"
+  gem "rugged"
 
   # from ruby_vcloud_sdk
   gem "nokogiri-diff"

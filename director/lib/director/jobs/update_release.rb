@@ -15,8 +15,6 @@ module Bosh::Director
       # @param [String] tmp_release_dir Directory containing release bundle
       # @param [Hash] options Release update options
       def initialize(tmp_release_dir, options = {})
-        super
-
         @tmp_release_dir = tmp_release_dir
         @release_model = nil
         @release_version_model = nil
@@ -69,12 +67,12 @@ module Bosh::Director
         release_tgz = File.join(@tmp_release_dir,
                                 Api::ReleaseManager::RELEASE_TGZ)
 
-        tar_output = `tar -C #{@tmp_release_dir} -xzf #{release_tgz} 2>&1`
-
-        if $?.exitstatus != 0
-          raise ReleaseInvalidArchive,
-                "Invalid release archive, tar returned #{$?.exitstatus}, " +
-                "tar output: #{tar_output}"
+        result = Bosh::Exec.sh("tar -C #{@tmp_release_dir} -xzf #{release_tgz} 2>&1", :on_error => :return)
+        if result.failed?
+          logger.error("Extracting release archive failed in dir #{@tmp_release_dir}, " +
+                       "tar returned #{result.exit_status}, " +
+                       "output: #{result.output}")
+          raise ReleaseInvalidArchive, "Extracting release archive failed. Check task debug log for details."
         end
       ensure
         if release_tgz && File.exists?(release_tgz)
@@ -89,7 +87,7 @@ module Bosh::Director
           raise ReleaseManifestNotFound, "Release manifest not found"
         end
 
-        @manifest = YAML.load_file(manifest_file)
+        @manifest = Psych.load_file(manifest_file)
         normalize_manifest
 
         @name = @manifest["name"]
@@ -159,21 +157,10 @@ module Bosh::Director
       # are Strings.
       # @return [void]
       def normalize_manifest
-        %w(name version).each do |property|
-          @manifest[property] = @manifest[property].to_s
-        end
+        Bosh::Director.hash_string_vals(@manifest, 'name', 'version')
 
-        @manifest["packages"].each do |package_meta|
-          %w(name version sha1).each do |property|
-            package_meta[property] = package_meta[property].to_s
-          end
-        end
-
-        @manifest["jobs"].each do |job_meta|
-          %w(name version sha1).each do |property|
-            job_meta[property] = job_meta[property].to_s
-          end
-        end
+        @manifest['packages'].each { |p| Bosh::Director.hash_string_vals(p, 'name', 'version', 'sha1') }
+        @manifest['jobs'].each { |j| Bosh::Director.hash_string_vals(j, 'name', 'version', 'sha1') }
       end
 
       # Resolves package dependencies, makes sure there are no cycles
@@ -366,11 +353,12 @@ module Bosh::Director
           logger.info("Creating #{desc} from provided bits")
 
           package_tgz = File.join(@tmp_release_dir, "packages", "#{name}.tgz")
-          output = `tar -tzf #{package_tgz} 2>&1`
-          if $?.exitstatus != 0
-            raise PackageInvalidArchive,
-                  "Invalid package archive, tar returned #{$?.exitstatus} " +
-                  "tar output: #{output}"
+          result = Bosh::Exec.sh("tar -tzf #{package_tgz} 2>&1", :on_error => :return)
+          if result.failed?
+            logger.error("Extracting #{desc} archive failed, " +
+                         "tar returned #{result.exit_status}, " +
+                         "output: #{result.output}")
+            raise PackageInvalidArchive, "Extracting #{desc} archive failed. Check task debug log for details."
           end
 
           # TODO: verify sha1
@@ -493,13 +481,13 @@ module Bosh::Director
 
         FileUtils.mkdir_p(job_dir)
 
-        output = `tar -C #{job_dir} -xzf #{job_tgz} 2>&1`
-
-        if $?.exitstatus != 0
-          raise JobInvalidArchive,
-                "Invalid job archive for `#{template.name}', " +
-                "tar returned #{$?.exitstatus}, " +
-                "tar output: #{output}"
+        desc = "job `#{name}/#{version}'"
+        result = Bosh::Exec.sh("tar -C #{job_dir} -xzf #{job_tgz} 2>&1", :on_error => :return)
+        if result.failed?
+          logger.error("Extracting #{desc} archive failed in dir #{job_dir}, " +
+                       "tar returned #{result.exit_status}, " +
+                       "output: #{result.output}")
+          raise JobInvalidArchive, "Extracting #{desc} archive failed. Check task debug log for details."
         end
 
         manifest_file = File.join(job_dir, "job.MF")
@@ -508,7 +496,7 @@ module Bosh::Director
                 "Missing job manifest for `#{template.name}'"
         end
 
-        job_manifest = YAML.load_file(manifest_file)
+        job_manifest = Psych.load_file(manifest_file)
 
         if job_manifest["templates"]
           job_manifest["templates"].each_key do |relative_path|

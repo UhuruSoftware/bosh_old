@@ -31,7 +31,7 @@ describe Bosh::Cli::Command::Base do
     it "normalizes target" do
       @cmd.target.should be_nil
       @cmd.set_target("test")
-      @cmd.target.should == "http://test:25555"
+      @cmd.target.should == "https://test:25555"
     end
 
     it "handles director errors when setting target" do
@@ -46,20 +46,20 @@ describe Bosh::Cli::Command::Base do
 
     it "sets target" do
       @cmd.set_target("test")
-      @cmd.target.should == "http://test:25555"
+      @cmd.target.should == "https://test:25555"
     end
 
     it "supports named targets" do
       @cmd.set_target("test", "mytarget")
-      @cmd.target.should == "http://test:25555"
+      @cmd.target.should == "https://test:25555"
 
       @cmd.set_target("foo", "myfoo")
 
       @cmd.set_target("mytarget")
-      @cmd.target.should == "http://test:25555"
+      @cmd.target.should == "https://test:25555"
 
       @cmd.set_target("myfoo")
-      @cmd.target.should == "http://foo:25555"
+      @cmd.target.should == "https://foo:25555"
     end
 
     it "logs user in" do
@@ -71,6 +71,21 @@ describe Bosh::Cli::Command::Base do
       @cmd.logged_in?.should be_true
       @cmd.username.should == "user"
       @cmd.password.should == "pass"
+    end
+
+    it "logs user in with highline" do
+      @director.should_receive(:authenticated?).and_return(true)
+      @director.should_receive(:user=).with("user")
+      @director.should_receive(:password=).with("pass")
+      @cmd.set_target("test")
+      @cmd.login(HighLine::String.new("user"), HighLine::String.new("pass"))
+      @cmd.logged_in?.should be_true
+      @cmd.username.should == "user"
+      @cmd.password.should == "pass"
+      config_file = File.read(File.expand_path(@config))
+      config_file.should_not match /HighLine::String/
+      config_file.should include("username: user")
+      config_file.should include("password: pass")
     end
 
     it "logs user out" do
@@ -248,9 +263,9 @@ describe Bosh::Cli::Command::Base do
       context "when the director doesn't include commit hash information (version < 1.5)" do
         let(:release) do
           {
-              "name" => "release-1",
-              "versions" => ["2.1-dev", "15", "2", "1"],
-              "in_use" => ["2.1-dev"]
+              'name' => 'release-1',
+              'versions' => ['2.1-dev', '15', '2', '1'],
+              'in_use' => ['2.1-dev']
           }
         end
 
@@ -278,12 +293,12 @@ describe Bosh::Cli::Command::Base do
       context "when the director includes commit hash information (version >= 1.5)" do
         let(:release) do
           {
-              "name" => "release-1",
-              "release_versions" => [
-                  {"version" => "2.1-dev", "commit_hash" => "unknown", "uncommitted_changes" => false, "currently_deployed" => true},
-                  {"version" => "15", "commit_hash" => "1a2b3c4d", "uncommitted_changes" => true, "currently_deployed" => false},
-                  {"version" => "2", "commit_hash" => "00000000", "uncommitted_changes" => true, "currently_deployed" => false},
-                  {"version" => "1", "commit_hash" => "unknown", "uncommitted_changes" => false, "currently_deployed" => false}
+              'name' => 'release-1',
+              'release_versions' => [
+                  {'version' => '2.1-dev', 'commit_hash' => 'unknown', 'uncommitted_changes' => false, 'currently_deployed' => true},
+                  {'version' => '15', 'commit_hash' => '1a2b3c4d', 'uncommitted_changes' => true, 'currently_deployed' => false},
+                  {'version' => '2', 'commit_hash' => '00000000', 'uncommitted_changes' => true, 'currently_deployed' => false},
+                  {'version' => '1', 'commit_hash' => 'unknown', 'uncommitted_changes' => false, 'currently_deployed' => false}
               ]
           }
         end
@@ -318,7 +333,7 @@ describe Bosh::Cli::Command::Base do
   describe Bosh::Cli::Command::JobManagement do
     before :each do
       @manifest_path = spec_asset("deployment.MF")
-      @manifest_yaml = YAML.dump({"name" => "foo"})
+      @manifest_yaml = Psych.dump({"name" => "foo"})
 
       @cmd = Bosh::Cli::Command::JobManagement.new
       @cmd.add_option(:non_interactive, true)

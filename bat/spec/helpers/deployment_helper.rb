@@ -3,6 +3,10 @@ require "tmpdir"
 
 module DeploymentHelper
 
+  def spec
+    @spec ||= {}
+  end
+
   def stemcell
     @stemcell ||= Stemcell.from_path(BH::read_environment('BAT_STEMCELL'))
   end
@@ -125,7 +129,7 @@ module DeploymentHelper
   end
 
   def load_deployment_spec
-    @spec ||= YAML.load_file(BH::read_environment('BAT_DEPLOYMENT_SPEC'))
+    @spec ||= Psych.load_file(BH::read_environment('BAT_DEPLOYMENT_SPEC'))
     # Always set the batlight.missing to something, or deployments will fail.
     # It is used for negative testing.
     @spec["properties"]["batlight"] ||= {}

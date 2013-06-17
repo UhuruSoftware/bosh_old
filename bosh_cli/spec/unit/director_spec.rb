@@ -4,13 +4,22 @@ require "spec_helper"
 
 describe Bosh::Cli::Director do
 
-  DUMMY_TARGET = "http://target.example.com:8080"
+  DUMMY_TARGET = "https://target.example.com:8080"
 
   before do
     URI.should_receive(:parse).with(DUMMY_TARGET).and_call_original
     Resolv.should_receive(:getaddresses).with("target.example.com").and_return(["127.0.0.1"])
     @director = Bosh::Cli::Director.new(DUMMY_TARGET, "user", "pass")
     @director.stub(retry_wait_interval: 0)
+  end
+
+  describe "checking availability" do
+    it "waits until director is ready" do
+      @director.should_receive(:get_status).and_raise(Bosh::Cli::DirectorError)
+      @director.should_receive(:get_status).and_return(cpi: 'aws')
+
+      @director.wait_until_ready
+    end
   end
 
   describe "fetching status" do
@@ -60,6 +69,20 @@ describe Bosh::Cli::Director do
              JSON.generate("username" => "joe", "password" => "pass")).
         and_return(true)
       @director.create_user("joe", "pass")
+    end
+
+    it "deletes users" do
+      @director.should_receive(:delete).
+        with("/users/joe").
+        and_return([204, "", {}])
+      @director.delete_user("joe").should == true
+    end
+
+    it "fails to delete users" do
+      @director.should_receive(:delete).
+        with("/users/joe").
+        and_return([500, "", {}])
+      @director.delete_user("joe").should == false
     end
 
     it "uploads stemcell" do
@@ -209,6 +232,14 @@ describe Bosh::Cli::Director do
       @director.change_job_state("foo", "manifest", "dea", 0, "detached")
     end
 
+    it "changes job instance resurrection state" do
+      @director.should_receive(:request).
+          with(:put, "/deployments/foo/jobs/dea/0/resurrection",
+               "application/json", JSON.dump(resurrection_paused: true)).
+          and_return(true)
+      @director.change_vm_resurrection("foo", "dea", 0, true)
+    end
+
     it "gets task state" do
       @director.should_receive(:get).
         with("/tasks/232").
@@ -233,6 +264,14 @@ describe Bosh::Cli::Director do
       @director.get_task_output(232, 42).should == ["test", 57]
     end
 
+    it "doesn't set task output body and new offset if there's a byte range unsatisfiable response" do
+      @director.should_receive(:get).
+        with("/tasks/232/output", nil,
+             nil, { "Range" => "bytes=42-" }).
+        and_return([416, "Byte range unsatisfiable", { :content_range => "bytes */100" }])
+      @director.get_task_output(232, 42).should == [nil, nil]
+    end
+    
     it "doesn't set task output new offset if it wasn't a partial response" do
       @director.should_receive(:get).
         with("/tasks/232/output", nil, nil,
@@ -252,6 +291,43 @@ describe Bosh::Cli::Director do
       @director.get_time_difference.to_i.should == 100
     end
 
+    it "takes snapshot for a deployment" do
+      @director.should_receive(:request_and_track).
+        with(:post, "/deployments/foo/snapshots", {}).
+        and_return(true)
+      @director.take_snapshot("foo")
+    end
+
+    it "takes snapshot for a job and index" do
+      @director.should_receive(:request_and_track).
+        with(:post, "/deployments/foo/jobs/bar/0/snapshots", {}).
+        and_return(true)
+      @director.take_snapshot("foo", "bar", "0")
+    end
+
+    it "lists snapshots for a deployment" do
+      @director.should_receive(:get).with("/deployments/foo/snapshots", "application/json").
+        and_return([200, JSON.generate([]), {}])
+      @director.list_snapshots("foo")
+    end
+
+    it "lists snapshots for a job and index" do
+      @director.should_receive(:get).with("/deployments/foo/jobs/bar/0/snapshots", "application/json").
+        and_return([200, JSON.generate([]), {}])
+      @director.list_snapshots("foo", "bar", "0")
+    end
+
+    it "deletes all snapshots of a deployment" do
+      @director.should_receive(:request_and_track).
+        with(:delete, "/deployments/foo/snapshots", {}).and_return(true)
+      @director.delete_all_snapshots("foo")
+    end
+
+    it "deletes snapshot" do
+      @director.should_receive(:request_and_track).
+        with(:delete, "/deployments/foo/snapshots/snap0a", {}).and_return(true)
+      @director.delete_snapshot("foo", "snap0a")
+    end
   end
 
   describe "checking status" do
@@ -271,12 +347,33 @@ describe Bosh::Cli::Director do
   end
 
   describe "tracking request" do
-    it "starts polling task if request responded with a redirect to task URL" do
+    it "starts polling task if request responded with a redirect (302) to task URL" do
       options = { :arg1 => 1, :arg2 => 2 }
 
       @director.should_receive(:request).
         with(:get, "/stuff", "text/plain", "abc").
         and_return([302, "body", { :location => "/tasks/502" }])
+
+      tracker = mock("tracker", :track => "polling result", :output => "foo")
+
+      Bosh::Cli::TaskTracker.should_receive(:new).
+        with(@director, "502", options).
+        and_return(tracker)
+
+      @director.request_and_track(:get, "/stuff",
+                                  {:content_type => "text/plain",
+                                   :payload => "abc",
+                                   :arg1 => 1, :arg2 => 2
+                                  }).
+        should == ["polling result", "502"]
+    end
+
+    it "starts polling task if request responded with a redirect (303) to task URL" do
+      options = { :arg1 => 1, :arg2 => 2 }
+
+      @director.should_receive(:request).
+        with(:get, "/stuff", "text/plain", "abc").
+        and_return([303, "body", { :location => "/tasks/502" }])
 
       tracker = mock("tracker", :track => "polling result", :output => "foo")
 
@@ -319,7 +416,7 @@ describe Bosh::Cli::Director do
       end
     end
 
-    it "considers all responses but 302 a failure" do
+    it "considers all responses but 302 and 303 a failure" do
       [200, 404, 403].each do |code|
         @director.should_receive(:request).
           with(:get, "/stuff", "text/plain", "abc").
@@ -366,14 +463,19 @@ describe Bosh::Cli::Director do
       password = "pass"
       auth = "Basic " + Base64.encode64("#{user}:#{password}").strip
 
-      client = mock("httpclient")
+      ssl_config = stub("ssl_config")
+      ssl_config.should_receive(:verify_mode=).
+          with(OpenSSL::SSL::VERIFY_NONE)
+      ssl_config.should_receive(:verify_callback=)
+
+      client = mock("httpclient", :ssl_config => ssl_config)
       client.should_receive(:send_timeout=).
         with(Bosh::Cli::Director::API_TIMEOUT)
       client.should_receive(:receive_timeout=).
         with(Bosh::Cli::Director::API_TIMEOUT)
       client.should_receive(:connect_timeout=).
         with(Bosh::Cli::Director::CONNECT_TIMEOUT)
-      URI.should_receive(:parse).with("http://nil-uri-given/").and_call_original
+
       HTTPClient.stub!(:new).and_return(client)
 
       client.should_receive(:request).
@@ -390,7 +492,7 @@ describe Bosh::Cli::Director do
                            :body => "test", :headers => {})
 
       @director.should_receive(:perform_http_request).
-        with(:get, "http://127.0.0.1:8080/stuff", "payload", "h1" => "a",
+        with(:get, "https://127.0.0.1:8080/stuff", "payload", "h1" => "a",
              "h2" => "b", "Content-Type" => "app/zb").
         and_return(mock_response)
 

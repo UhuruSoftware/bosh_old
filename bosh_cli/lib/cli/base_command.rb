@@ -34,7 +34,9 @@ module Bosh::Cli
       # @return [Bosh::Cli::Config] Current configuration
       def config
         @config ||= begin
-          config_file = options[:config] || Bosh::Cli::DEFAULT_CONFIG_PATH
+          # Handle the environment variable being set to the empty string.
+          env_bosh_config = ENV['BOSH_CONFIG'].to_s.empty? ? nil : ENV['BOSH_CONFIG']
+          config_file = options[:config] || env_bosh_config || Bosh::Cli::DEFAULT_CONFIG_PATH
           Bosh::Cli::Config.new(config_file)
         end
       end
@@ -115,7 +117,7 @@ module Bosh::Cli
       end
 
       def target_name
-        config.target_name || target_url
+        options[:target] || config.target_name || target_url
       end
 
       # Sets or returns command exit code
@@ -155,6 +157,7 @@ module Bosh::Cli
         end
 
         say("\n#{report}") if report
+        say("\nFor a more detailed error report, run: bosh task #{task_id} --debug") if status == :error
       end
 
       protected
@@ -202,14 +205,20 @@ module Bosh::Cli
       end
 
       def dirty_state?
-        `which git`
-        return false unless $? == 0
-        File.directory?(".git") && `git status --porcelain | wc -l`.to_i > 0
+        git_status = `git status 2>&1`
+        case $?.exitstatus
+          when 128 # Not in a git repo
+            false
+          when 127 # git command not found
+            false
+          else
+            !git_status.lines.to_a.last.include?("nothing to commit")
+        end
       end
 
       def normalize_url(url)
         had_port = url.to_s =~ /:\d+$/
-        url = "http://#{url}" unless url.match(/^https?/)
+        url = "https://#{url}" unless url.match(/^http:?/)
         uri = URI.parse(url)
         uri.port = DEFAULT_DIRECTOR_PORT unless had_port
         uri.to_s.strip.gsub(/\/$/, "")

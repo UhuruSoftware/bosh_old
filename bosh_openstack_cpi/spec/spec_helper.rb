@@ -26,7 +26,7 @@ end
 def mock_cloud_options
   {
     "openstack" => {
-      "auth_url" => "http://127.0.0.1:5000/v2.0/tokens",
+      "auth_url" => "http://127.0.0.1:5000/v2.0",
       "username" => "admin",
       "api_key" => "nova",
       "tenant" => "admin",
@@ -50,7 +50,7 @@ end
 
 def mock_registry(endpoint = "http://registry:3333")
   registry = mock("registry", :endpoint => endpoint)
-  Bosh::OpenStackCloud::RegistryClient.stub!(:new).and_return(registry)
+  Bosh::Registry::Client.stub!(:new).and_return(registry)
   registry
 end
 
@@ -61,11 +61,13 @@ def mock_cloud(options = nil)
   volumes = double("volumes")
   addresses = double("addresses")
   snapshots = double("snapshots")
+  key_pairs = double("key_pairs")
+  security_groups = double("security_groups")
 
-  glance = double(Bosh::OpenStackCloud::Connection, :service => :image)
+  glance = double(Fog::Image)
   Fog::Image.stub(:new).and_return(glance)
 
-  openstack = double(Bosh::OpenStackCloud::Connection, :service => :compute)
+  openstack = double(Fog::Compute)
 
   openstack.stub(:servers).and_return(servers)
   openstack.stub(:images).and_return(images)
@@ -73,6 +75,8 @@ def mock_cloud(options = nil)
   openstack.stub(:volumes).and_return(volumes)
   openstack.stub(:addresses).and_return(addresses)
   openstack.stub(:snapshots).and_return(snapshots)
+  openstack.stub(:key_pairs).and_return(key_pairs)
+  openstack.stub(:security_groups).and_return(security_groups)
 
   Fog::Compute.stub(:new).and_return(openstack)
 
@@ -84,10 +88,10 @@ end
 def mock_glance(options = nil)
   images = double("images")
 
-  openstack = double(Bosh::OpenStackCloud::Connection, :service => :compute)
+  openstack = double(Fog::Compute)
   Fog::Compute.stub(:new).and_return(openstack)
 
-  glance = double(Bosh::OpenStackCloud::Connection, :service => :image)
+  glance = double(Fog::Image)
   glance.stub(:images).and_return(images)
 
   Fog::Image.stub(:new).and_return(glance)

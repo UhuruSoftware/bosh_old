@@ -4,6 +4,24 @@ require 'blobstore_client'
 
 module Bosh::Agent
   module Message
+    # This agent message "compile_package" fetches the source package from
+    # the blobstore, fetches the dependency compiled packages, compiles the
+    # source package, packs it into a tgz blob, and uploads it to the same
+    # blobstore. It returns the uploaded blob's blobstore_id & sha1.
+    #
+    # This message has the following uses:
+    # * the package_compiler (within the stemcell_builder) to
+    #   compile packages to the microbosh/mcf stemcell's local blobstore
+    # * the director requests packages be compiled during deployment
+    #   if they are not yet compiled and available in the blobstore
+    #
+    # Source packages must have a `packaging` executable script. It can find the
+    # unpackaged source files in the directory it is run in (which is also provided
+    # as $BOSH_COMPILE_TARGET variable).
+    # The packaging script MUST place all compiled assets within the single folder
+    # specified as $BOSH_INSTALL_TARGET.
+    # The packaging script is also provided the environment variables $BOSH_PACKAGE_NAME
+    # and $BOSH_PACKAGE_VERSION
     class CompilePackage
       attr_accessor :blobstore_id, :package_name, :package_version, :package_sha1
       attr_accessor :compile_base, :install_base
@@ -162,6 +180,10 @@ module Bosh::Agent
       def compile
         FileUtils.rm_rf install_dir if File.directory?(install_dir)
         FileUtils.mkdir_p install_dir
+
+        pkg_link_dst = File.join(@base_dir, 'packages', @package_name)
+        FileUtils.ln_sf(install_dir, pkg_link_dst)
+
         pct_space_used = pct_disk_used(@compile_base)
         if pct_space_used >= @max_disk_usage_pct
           raise Bosh::Agent::MessageHandlerError,
@@ -175,7 +197,7 @@ module Bosh::Agent
 
           # TODO: error handling
           ENV['BOSH_COMPILE_TARGET'] = compile_dir
-          ENV['BOSH_INSTALL_TARGET'] = install_dir
+          ENV['BOSH_INSTALL_TARGET'] = pkg_link_dst
           ENV['BOSH_PACKAGE_NAME'] = @package_name.to_s
           ENV['BOSH_PACKAGE_VERSION'] = @package_version.to_s
           if File.exist?('packaging')

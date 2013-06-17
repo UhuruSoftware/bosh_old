@@ -66,6 +66,7 @@ module Bosh::Cli
         has_blobstore_secrets?(bs, "simple", "user", "password") ||
         has_blobstore_secrets?(bs, "swift", "rackspace") ||
         has_blobstore_secrets?(bs, "swift", "hp") ||
+        has_blobstore_secrets?(bs, "swift", "openstack") ||
         has_blobstore_secrets?(bs, "s3", "access_key_id", "secret_access_key")
     end
 
@@ -111,14 +112,8 @@ module Bosh::Cli
     end
 
     def save_config
-      # TODO: introduce write_yaml helper
-      File.open(@dev_config_file, "w") do |f|
-        YAML.dump(@dev_config, f)
-      end
-
-      File.open(@final_config_file, "w") do |f|
-        YAML.dump(@final_config, f)
-      end
+      write_yaml(@dev_config_file, @dev_config)
+      write_yaml(@final_config_file, @final_config)
     end
 
     private
@@ -184,7 +179,7 @@ module Bosh::Cli
         @dev_config = new_dev_config
 
         File.open(@dev_config_file, "w") do |f|
-          YAML.dump(@dev_config, f)
+          Psych.dump(@dev_config, f)
         end
         say("Migrated dev config file format".green)
       end
@@ -211,7 +206,7 @@ module Bosh::Cli
 
         @final_config = new_final_config
 
-        File.open(@final_config_file, "w") { |f| YAML.dump(@final_config, f) }
+        File.open(@final_config_file, "w") { |f| Psych.dump(@final_config, f) }
         say("Migrated final config file format".green)
       end
     end
@@ -221,6 +216,14 @@ module Bosh::Cli
         load_yaml_file(file)
       else
         {}
+      end
+    end
+
+    def write_yaml(file, hash)
+      unless hash == load_config(file)
+        File.open(file, "w+") do |f|
+          Psych.dump(hash, f)
+        end
       end
     end
 

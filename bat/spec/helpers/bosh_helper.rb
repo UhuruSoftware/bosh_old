@@ -33,6 +33,30 @@ module BoshHelper
     result
   end
 
+  def get_vms
+    output = bosh("vms --details").output
+    table = output.lines.grep(/\|/)
+
+    table = table.map { |line| line.split('|').map(&:strip).reject(&:empty?) }
+    headers = table.shift || []
+    headers.map! do |header|
+      header.downcase.tr('/ ', '_').to_sym
+    end
+    output = []
+    table.each do |row|
+      output << Hash[headers.zip(row)]
+    end
+    output
+  end
+
+  def wait_for_vm(name)
+    5.times do
+      vm = get_vms.detect { |v| v[:job_index] == name }
+      return vm if vm
+    end
+    nil
+  end
+
   def self.bosh_cli_config_path
     @bosh_cli_config_tempfile ||= Tempfile.new("bosh_config")
     @bosh_cli_config_tempfile.path
@@ -84,6 +108,7 @@ module BoshHelper
   def http_client
     return @bosh if @bosh
     @bosh = HTTPClient.new
+    @bosh.ssl_config.verify_mode = OpenSSL::SSL::VERIFY_NONE
     # TODO make user/pass configurable
     @bosh.set_auth(director_url, "admin", "admin")
     @bosh
@@ -95,7 +120,7 @@ module BoshHelper
   end
 
   def director_url
-    "http://#{bosh_director}:25555"
+    "https://#{bosh_director}:25555"
   end
 
   def info
@@ -104,6 +129,10 @@ module BoshHelper
 
   def aws?
     info["cpi"] == "aws"
+  end
+
+  def openstack?
+    info["cpi"] == "openstack"
   end
 
   def vsphere?

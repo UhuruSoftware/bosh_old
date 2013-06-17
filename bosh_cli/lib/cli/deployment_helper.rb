@@ -42,7 +42,7 @@ module Bosh::Cli
           hash
         end
 
-        manifest = YAML.load(compiler.result)
+        manifest = Psych.load(compiler.result)
       end
 
       if manifest["name"].blank? || manifest["director_uuid"].blank?
@@ -62,7 +62,7 @@ module Bosh::Cli
       resolve_release_aliases(manifest)
       resolve_stemcell_aliases(manifest)
 
-      options[:yaml] ? YAML.dump(manifest) : manifest
+      options[:yaml] ? Psych.dump(manifest) : manifest
     end
 
     # Check if the 2 deployments are different.
@@ -106,7 +106,7 @@ module Bosh::Cli
       # but it turned out to be confusing to many users and thus has
       # been removed.
       return if current_deployment["manifest"].nil?
-      current_manifest = YAML.load(current_deployment["manifest"])
+      current_manifest = Psych.load(current_deployment["manifest"])
 
       unless current_manifest.is_a?(Hash)
         err("Current deployment manifest format is invalid, " +
@@ -218,7 +218,11 @@ module Bosh::Cli
 
       releases.each do |release|
         if release["version"] == "latest"
-          release["version"] = latest_release_versions[release["name"]]
+          latest_release_version = latest_release_versions[release["name"]]
+          unless latest_release_version
+            err("Release '#{release['name']}' not found on director. Unable to resolve 'latest' alias in manifest.")
+          end
+          release["version"] = latest_release_version
         end
 
         # TODO: why do we care about casting to Integer when possible?
@@ -226,6 +230,15 @@ module Bosh::Cli
           release["version"] = release["version"].to_i
         end
       end
+    end
+
+    def job_exists_in_deployment?(jobname)
+      jobs = prepare_deployment_manifest["jobs"].map { |job| job["name"] }
+      jobs.include?(jobname) ? true : false
+    end
+
+    def job_must_exist_in_deployment(job)
+      err("Job `#{job}' doesn't exist") unless job_exists_in_deployment?(job)
     end
 
     private

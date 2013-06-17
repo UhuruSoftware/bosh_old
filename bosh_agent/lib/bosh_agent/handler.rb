@@ -88,6 +88,7 @@ module Bosh::Agent
           else
             @logger.debug("SMTP: #{@smtp_password}")
             @processor = Bosh::Agent::AlertProcessor.start("127.0.0.1", @smtp_port, @smtp_user, @smtp_password)
+            setup_syslog_monitor
           end
         end
       end
@@ -132,6 +133,10 @@ module Bosh::Agent
       end
     end
 
+    def setup_syslog_monitor
+      Bosh::Agent::SyslogMonitor.start(@nats, @agent_id)
+    end
+
     def handle_message(json)
       msg = Yajl::Parser.new.parse(json)
 
@@ -157,7 +162,9 @@ module Bosh::Agent
 
       processor = lookup(method)
       if processor
-        Thread.new { process_in_thread(processor, reply_to, method, args) }
+        EM.defer do
+          process_in_thread(processor, reply_to, method, args)
+        end
       elsif method == "get_task"
         handle_get_task(reply_to, args.first)
       elsif method == "shutdown"

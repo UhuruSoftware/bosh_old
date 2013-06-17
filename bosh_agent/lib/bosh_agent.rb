@@ -23,6 +23,10 @@ require "common/exec"
 require "common/properties"
 require "encryption/encryption_handler"
 
+module Bosh::Agent
+  BOSH_APP = BOSH_APP_USER = BOSH_APP_GROUP = "vcap"
+end
+
 require "bosh_agent/ext"
 require "bosh_agent/version"
 
@@ -30,12 +34,19 @@ require "bosh_agent/template"
 require "bosh_agent/errors"
 require "bosh_agent/remote_exception"
 
+require "bosh_agent/sigar_box"
 require "bosh_agent/config"
 require "bosh_agent/util"
 require "bosh_agent/monit"
 
 require "bosh_agent/infrastructure"
 require "bosh_agent/platform"
+require "bosh_agent/platform/unix"
+require "bosh_agent/platform/linux"
+require "bosh_agent/platform/ubuntu"
+require "bosh_agent/platform/rhel"
+require "bosh_agent/platform/centos"
+require "bosh_agent/platform/microcloud"
 
 require "bosh_agent/bootstrap"
 
@@ -50,7 +61,9 @@ require "bosh_agent/file_matcher"
 require "bosh_agent/file_aggregator"
 require "bosh_agent/ntp"
 require "bosh_agent/sshd_monitor"
+require "bosh_agent/syslog_monitor"
 
+require "bosh_agent/apply_plan/helpers"
 require "bosh_agent/apply_plan/job"
 require "bosh_agent/apply_plan/package"
 require "bosh_agent/apply_plan/plan"
@@ -67,12 +80,7 @@ require "bosh_agent/message/ssh"
 
 require "bosh_agent/handler"
 
-YAML::ENGINE.yamler = 'syck' if defined?(YAML::ENGINE.yamler)
-
 module Bosh::Agent
-
-  BOSH_APP = BOSH_APP_USER = BOSH_APP_GROUP = "vcap"
-
   class << self
     def run(options = {})
       Runner.new(options).start
@@ -105,7 +113,8 @@ module Bosh::Agent
         @logger.info("Skipping configuration step (use '-c' argument to configure on start) ")
       end
 
-      if Config.mbus.start_with?("http")
+      if Config.mbus.start_with?("https")
+        @logger.info("Starting up https agent")
         require "bosh_agent/http_handler"
         Bosh::Agent::HTTPHandler.start
       else

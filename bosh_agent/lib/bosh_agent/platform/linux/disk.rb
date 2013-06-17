@@ -1,7 +1,4 @@
 # Copyright (c) 2009-2012 VMware, Inc.
-require 'bosh_agent/platform/linux'
-
-require 'retryable'
 
 module Bosh::Agent
   class Platform::Linux::Disk
@@ -114,7 +111,7 @@ module Bosh::Agent
     def get_available_scsi_path(disk_id)
       rescan_scsi_bus
       blockdev = nil
-      Retryable.retryable(:tries=> @disk_retry_timeout, :on => Bosh::Agent::DiskNotFoundError, :sleep => lambda{|n| [2**(n-1), 10].min }) do
+      Bosh::Common.retryable(tries: @disk_retry_timeout, on: Bosh::Agent::DiskNotFoundError) do
         blockdev = detect_block_device(disk_id)
       end
       File.join('/dev', blockdev)

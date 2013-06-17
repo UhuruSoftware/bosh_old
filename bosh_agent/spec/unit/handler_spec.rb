@@ -12,6 +12,7 @@ describe Bosh::Agent::Handler do
     # TODO: refactor the whole thing to avoid stubs such as these
     Bosh::Agent::AlertProcessor.stub(:start)
     Bosh::Agent::Heartbeat.stub(:enable)
+    Bosh::Agent::SyslogMonitor.stub(:start)
 
     Bosh::Agent::Config.process_alerts = true
     Bosh::Agent::Config.smtp_port      = 55213
@@ -36,9 +37,24 @@ describe Bosh::Agent::Handler do
     handler.start
   end
 
+  it "should attempt to start syslog monitor when handler starts" do
+    Bosh::Agent::SyslogMonitor.should_receive(:start).with(@nats, anything)
+
+    handler = Bosh::Agent::Handler.new
+    handler.start
+  end
+
   it "should not start alert processor if alerts are disabled via config" do
     Bosh::Agent::Config.process_alerts = false
     Bosh::Agent::AlertProcessor.should_not_receive(:start)
+
+    handler = Bosh::Agent::Handler.new
+    handler.start
+  end
+
+  it "should not start syslog monitor if alerts are disabled via config" do
+    Bosh::Agent::Config.process_alerts = false
+    Bosh::Agent::SyslogMonitor.should_not_receive(:start)
 
     handler = Bosh::Agent::Handler.new
     handler.start

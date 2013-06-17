@@ -7,6 +7,7 @@ Gem::Specification.new do |s|
   s.version      = version
   s.platform     = Gem::Platform::RUBY
   s.summary      = "BOSH blobstore client"
+  s.description  = "BOSH blobstore client\n#{`git rev-parse HEAD`[0, 6]}"
   s.author       = "VMware"
   s.homepage     = 'https://github.com/cloudfoundry/bosh'
   s.license      = 'Apache 2.0'
@@ -20,7 +21,7 @@ Gem::Specification.new do |s|
   s.executables  = %w(blobstore_client_console)
 
   s.add_dependency "aws-sdk", "1.8.5"
-  s.add_dependency "fog", "~> 1.10.0"
+  s.add_dependency "fog", "~> 1.12.1"
   s.add_dependency "httpclient", "=2.2.4"
   s.add_dependency "multi_json", "~> 1.1"
   s.add_dependency "ruby-atmos-pure", "~> 1.0.5"

@@ -7,7 +7,7 @@ Gem::Specification.new do |s|
   s.version      = version
   s.platform     = Gem::Platform::RUBY
   s.summary      = "BOSH Simple Blobstore Server"
-  s.description  = s.summary
+  s.description  = "BOSH Simple Blobstore Server\n#{`git rev-parse HEAD`[0, 6]}"
   s.author       = "VMware"
   s.homepage     = 'https://github.com/cloudfoundry/bosh'
   s.license      = 'Apache 2.0'
@@ -18,7 +18,7 @@ Gem::Specification.new do |s|
   s.require_path = "lib"
 
   s.add_dependency "thin", "~>1.5.0"
-  s.add_dependency "sinatra", "~> 1.2.8"
+  s.add_dependency "sinatra", "~> 1.4.2"
 
   s.bindir      = 'bin'
   s.executables << 'simple_blobstore_server'

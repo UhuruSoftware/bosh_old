@@ -171,6 +171,16 @@ describe Bosh::Cli::DeploymentHelper do
         @manifest["releases"].detect { |release| release["name"] == "bat" }["version"].should == "3.1-dev"
         @manifest["releases"].detect { |release| release["name"] == "bosh" }["version"].should == 2
       end
+
+      context 'when the release is not found on the director' do
+        let(:release_list) { [] }
+
+        it 'raises an error' do
+          expect { tester.resolve_release_aliases(@manifest) }.to raise_error(Bosh::Cli::CliError,
+                                                                              "Release 'bosh' not found on director. Unable to resolve 'latest' alias in manifest.")
+        end
+      end
+
     end
 
     it "casts final release versions to Integer" do
@@ -197,7 +207,7 @@ describe Bosh::Cli::DeploymentHelper do
       }
 
       manifest_file = Tempfile.new("manifest")
-      YAML.dump(manifest, manifest_file)
+      Psych.dump(manifest, manifest_file)
       manifest_file.close
       director = mock(Bosh::Cli::Director)
 
@@ -225,7 +235,7 @@ describe Bosh::Cli::DeploymentHelper do
       }
 
       manifest_file = Tempfile.new("manifest")
-      YAML.dump(manifest, manifest_file)
+      Psych.dump(manifest, manifest_file)
       manifest_file.close
       director = mock(Bosh::Cli::Director, :uuid => "deadbeef")
 
@@ -245,6 +255,20 @@ describe Bosh::Cli::DeploymentHelper do
       manifest["resource_pools"][0]["stemcell"]["version"].should == "22.6.4"
       manifest["resource_pools"][1]["stemcell"]["version"].should == 22
       manifest["resource_pools"][2]["stemcell"]["version"].should == 4.1
+    end
+  end
+  
+  describe '#job_exists_in_deployment?' do    
+    let(:manifest) { { 'name' => 'mycloud', 'jobs' => [{'name' => 'job1'}] } }
+
+    it 'should return true if job exists in deployment' do
+      tester.should_receive(:prepare_deployment_manifest).and_return(manifest)
+      tester.job_exists_in_deployment?('job1').should be_true    
+    end
+
+    it 'should return false if job does not exists in deployment' do
+      tester.should_receive(:prepare_deployment_manifest).and_return(manifest)
+      tester.job_exists_in_deployment?('job2').should be_false     
     end
   end
 end

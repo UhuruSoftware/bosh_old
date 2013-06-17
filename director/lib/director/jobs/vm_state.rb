@@ -9,7 +9,6 @@ module Bosh::Director
 
       # @param [Integer] deployment_id Deployment id
       def initialize(deployment_id, format)
-        super
         @deployment_id = deployment_id
         @format = format
       end
@@ -56,6 +55,8 @@ module Bosh::Director
           job_state = "unresponsive agent"
         end
 
+        instance = Models::Instance.find(deployment_id: @deployment_id, job: job_name, index: index)
+
         {
           :vm_cid => vm.cid,
           :ips => ips,
@@ -64,7 +65,8 @@ module Bosh::Director
           :index => index,
           :job_state => job_state,
           :resource_pool => resource_pool,
-          :vitals => job_vitals
+          :vitals => job_vitals,
+          :resurrection_paused => instance ? instance.resurrection_paused  : nil,
         }
       end
     end
