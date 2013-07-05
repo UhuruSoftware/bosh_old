@@ -13,7 +13,7 @@ module Bosh
         @client = HTTPClient.new
         @endpoint = @options[:endpoint]
         #@bucket = @options[:bucket] || "resources" # dav (or simple) doesn't support buckets
-        @headers = {}
+        @headers = {'Translate' => 'f'}
         user = @options[:user]
         password = @options[:password]
         if user && password
