@@ -24,8 +24,9 @@ case $1 in
 
   stop)
     PID=$(head -1 $PIDFILE)
-    kill $PID
-    while [ -e /proc/$PID ]; do sleep 0.1; done
+    CHILD_PIDS=`pgrep -P ${PID}`
+    kill -9 ${PID}
+    [ ! -z "$CHILD_PIDS" ] && for pid in $CHILD_PIDS ; do kill -9 $pid ; done
     rm -f $PIDFILE
     ;;
 
