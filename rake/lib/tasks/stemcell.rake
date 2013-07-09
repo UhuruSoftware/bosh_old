@@ -78,7 +78,7 @@ namespace :stemcell do
   task :basic_php, [:infrastructure] => "all:finalize_release_directory"  do |t, args|
     options = default_options(args)
     options[:stemcell_name] ||= "bosh-stemcell-php"
-    options[:stemcell_version] ||= Bosh::Agent::VERSION
+    options[:stemcell_version] ||= "1.5.0.pre.4" # Bosh::Agent::VERSION
     options[:image_create_disk_size] = 1680
 
     build("stemcell-#{args[:infrastructure]}", options)
