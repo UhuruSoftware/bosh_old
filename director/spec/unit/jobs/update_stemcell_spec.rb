@@ -1,6 +1,7 @@
 # Copyright (c) 2009-2012 VMware, Inc.
 
 require File.expand_path("../../../spec_helper", __FILE__)
+require 'net/http'
 
 describe Bosh::Director::Jobs::UpdateStemcell do
 
@@ -22,7 +23,13 @@ describe Bosh::Director::Jobs::UpdateStemcell do
     FileUtils.rm_rf(@stemcell_file.path)
   end
 
-  it "should upload the stemcell" do
+  describe 'described_class.job_type' do
+    it 'returns a symbol representing job type' do
+      expect(described_class.job_type).to eq(:update_stemcell)
+    end
+  end
+
+  it "should upload a local stemcell" do
     @cloud.should_receive(:create_stemcell).with(anything(), {"ram" => "2gb"}).and_return do |image, _|
       contents = File.open(image) { |f| f.read }
       contents.should eql("image contents")
@@ -38,6 +45,23 @@ describe Bosh::Director::Jobs::UpdateStemcell do
     stemcell.sha1.should == "shawone"
   end
 
+  it "should upload a remote stemcell" do
+    @cloud.should_receive(:create_stemcell).with(anything(), {"ram" => "2gb"}).and_return do |image, _|
+      contents = File.open(image) { |f| f.read }
+      contents.should eql("image contents")
+      "stemcell-cid"
+    end
+    
+    update_stemcell_job = Bosh::Director::Jobs::UpdateStemcell.new(@stemcell_file.path, {'remote' => true})
+    update_stemcell_job.should_receive(:download_remote_stemcell)    
+    update_stemcell_job.perform
+    
+    stemcell = Bosh::Director::Models::Stemcell.find(:name => "jeos", :version => "5")
+    stemcell.should_not be_nil
+    stemcell.cid.should == "stemcell-cid"
+    stemcell.sha1.should == "shawone"
+  end
+  
   it "should cleanup the stemcell file" do
     @cloud.should_receive(:create_stemcell).with(anything(), {"ram" => "2gb"}).and_return do |image, _|
       contents = File.open(image) { |f| f.read }

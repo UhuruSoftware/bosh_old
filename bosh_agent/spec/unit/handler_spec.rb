@@ -12,15 +12,14 @@ describe Bosh::Agent::Handler do
     # TODO: refactor the whole thing to avoid stubs such as these
     Bosh::Agent::AlertProcessor.stub(:start)
     Bosh::Agent::Heartbeat.stub(:enable)
+    Bosh::Agent::SyslogMonitor.stub(:start)
 
     Bosh::Agent::Config.process_alerts = true
     Bosh::Agent::Config.smtp_port      = 55213
     Bosh::Agent::Config.smtp_user      = "user"
     Bosh::Agent::Config.smtp_password  = "pass"
 
-    EM.stub!(:next_tick).and_return do |block|
-      block.call
-    end
+    EM.stub!(:next_tick).and_yield
   end
 
   it "should result in a value payload" do
@@ -36,9 +35,24 @@ describe Bosh::Agent::Handler do
     handler.start
   end
 
+  it "should attempt to start syslog monitor when handler starts" do
+    Bosh::Agent::SyslogMonitor.should_receive(:start).with(@nats, anything)
+
+    handler = Bosh::Agent::Handler.new
+    handler.start
+  end
+
   it "should not start alert processor if alerts are disabled via config" do
     Bosh::Agent::Config.process_alerts = false
     Bosh::Agent::AlertProcessor.should_not_receive(:start)
+
+    handler = Bosh::Agent::Handler.new
+    handler.start
+  end
+
+  it "should not start syslog monitor if alerts are disabled via config" do
+    Bosh::Agent::Config.process_alerts = false
+    Bosh::Agent::SyslogMonitor.should_not_receive(:start)
 
     handler = Bosh::Agent::Handler.new
     handler.start
@@ -312,5 +326,28 @@ describe Bosh::Agent::Handler do
     handler = Bosh::Agent::Handler.new
     handler.start
     handler.publish("reply", payload)
+  end
+
+  describe 'prepare_network_change' do
+    let(:udev_file) { '/etc/udev/rules.d/70-persistent-net.rules' }
+    let(:settings_file) { Tempfile.new('test') }
+    
+    it 'should delete the settings file and restart the agent' do      
+      handler = Bosh::Agent::Handler.new
+      handler.start
+      Bosh::Agent::Config.configure = true
+      Bosh::Agent::Config.settings_file = settings_file 
+      
+      EM.should_receive(:defer).and_yield
+      @nats.should_receive(:publish).and_yield
+      File.should_receive(:exist?).with(udev_file).and_return(false)
+      File.should_receive(:delete).with(settings_file)
+      handler.should_receive(:kill_main_thread_in).with(1)
+      
+      handler.handle_message(Yajl::Encoder.encode('method' => 'prepare_network_change', 
+                                                  'reply_to' => 'inbox.client_id',
+                                                  'arguments' => []))
+  
+    end
   end
 end

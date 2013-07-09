@@ -1,5 +1,7 @@
 # Copyright (c) 2009-2012 VMware, Inc.
 
+require 'common/deep_copy'
+
 module Bosh::Director
   class DeploymentPlan
     class Job
@@ -270,7 +272,7 @@ module Bosh::Director
         # Manifest can contain global and per-job properties section
         job_properties = safe_property(@job_spec, "properties", :class => Hash, :optional => true)
 
-        @all_properties = deployment.properties._deep_copy
+        @all_properties = Bosh::Common::DeepCopy.copy(deployment.properties)
 
         if job_properties
           @all_properties.recursive_merge!(job_properties)
@@ -445,8 +447,8 @@ module Bosh::Director
           raise DirectorError, "Can't extract job properties before parsing job templates"
         end
 
-        return collection if @templates.all? { |template| template.properties.nil? }
-        return extract_template_properties(collection) if @templates.none? { |template| template.properties.nil? }
+        return collection if @templates.none? { |template| template.properties }
+        return extract_template_properties(collection) if @templates.all? { |template| template.properties }
         raise JobIncompatibleSpecs, "Job `#{name}' has specs with conflicting property definition styles between" +
             " its job spec templates.  This may occur if colocating jobs, one of which has a spec file including" +
             " `properties' and one which doesn't."

@@ -38,13 +38,11 @@ module Bosh::Director
 
     def reset(vms=nil)
       if vms
-        vms.each do |job, indices|
-          indices.each do |index|
-            instance = @instance_manager.find_by_name(@deployment.name, job, index)
-            Models::DeploymentProblem.where(deployment: deployment,
-                                            :resource_id => instance.vm.id,
-                                            :state => "open").update(state: "closed")
-          end
+        vms.each do |job, index|
+          instance = @instance_manager.find_by_name(@deployment.name, job, index)
+          Models::DeploymentProblem.where(deployment: deployment,
+                                          :resource_id => instance.vm.id,
+                                          :state => "open").update(state: "closed")
         end
       else
         Models::DeploymentProblem.where(state: "open", deployment: deployment).update(state: "closed")
@@ -74,11 +72,9 @@ module Bosh::Director
     def scan_vms(vms=nil)
       if vms
         vm_list = []
-        vms.each do |job, indices|
-          indices.each do |index|
-            instance = @instance_manager.find_by_name(@deployment.name, job, index)
-            vm_list << instance.vm
-          end
+        vms.each do |job, index|
+          instance = @instance_manager.find_by_name(@deployment.name, job, index)
+          vm_list << instance.vm
         end
         vms = vm_list
       else
@@ -163,7 +159,10 @@ module Bosh::Director
         begin
           disk_list = agent.list_disk
           mounted_disk_cid = disk_list.first
+        rescue Bosh::Director::RpcTimeout => e
+          mounted_disk_cid = nil
         rescue RuntimeError => e
+          # For old agents that doesn't implement list_disk we assume the disk is mounted
           logger.info("agent.list_disk failed on agent #{vm.agent_id}")
         end
         add_disk_owner(mounted_disk_cid, vm.cid) if mounted_disk_cid
@@ -172,7 +171,8 @@ module Bosh::Director
         return :unbound if is_unbound_instance_vm?(vm, instance, state)
         :ok
       rescue Bosh::Director::RpcTimeout
-        # unresponsive disk, not invalid disk_info
+        # We add the disk to avoid a duplicate problem when timeouts fetching agent status (unresponsive_agent and
+        # mount_info_mismatch)
         add_disk_owner(mounted_disk_cid, vm.cid) if mounted_disk_cid
 
         begin

@@ -1,3 +1,5 @@
+require 'common/deep_copy'
+
 module Bosh::Director
   # Creates VM model and call out to CPI to create VM in IaaS
   # @todo refactor to accept Instance or IdleVM instead of passing in all of the
@@ -5,6 +7,9 @@ module Bosh::Director
   class VmCreator
     include EncryptionHelper
     include MetadataHelper
+
+    # this is used to retry VM creation on clouds that are unreliable (e.g. AWS)
+    MAX_CREATE_VM_TRIES = 5
 
     def self.create(*args)
       new.create(*args)
@@ -20,8 +25,7 @@ module Bosh::Director
       vm = nil
       vm_cid = nil
 
-      env.extend(DeepCopy)
-      env = env._deep_copy
+      env = Bosh::Common::DeepCopy.copy(env)
 
       agent_id = self.class.generate_agent_id
 
@@ -38,7 +42,15 @@ module Bosh::Director
         options[:credentials] = credentials
       end
 
-      vm_cid = @cloud.create_vm(agent_id, stemcell.cid, cloud_properties, network_settings, disks, env)
+      count = 0
+      begin
+        vm_cid = @cloud.create_vm(agent_id, stemcell.cid, cloud_properties, network_settings, disks, env)
+      rescue Bosh::Clouds::VMCreationFailed => e
+        count += 1
+        logger.error("failed to create VM, retrying (#{count})")
+        retry if e.ok_to_retry && count < MAX_CREATE_VM_TRIES
+        raise e
+      end
 
       options[:cid] = vm_cid
       vm = Models::Vm.new(options)

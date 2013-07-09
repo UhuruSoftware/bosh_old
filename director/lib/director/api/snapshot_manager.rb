@@ -1,18 +1,20 @@
 module Bosh::Director
   module Api
     class SnapshotManager
-      include TaskHelper
-
-      def create_snapshot(user, instance, options)
-        task = create_task(user, :create_snapshot, "create snapshot")
-        Resque.enqueue(Jobs::CreateSnapshot, task.id, instance.id, options)
-        task
+      def create_deployment_snapshot_task(user, deployment, options = {})
+        JobQueue.new.enqueue(user, Jobs::SnapshotDeployment, 'snapshot deployment', [deployment.name, options])
       end
 
-      def delete_snapshots(user, snapshot_cids)
-        task = create_task(user, :delete_snapshot, "delete snapshot")
-        Resque.enqueue(Jobs::DeleteSnapshots, task.id, snapshot_cids)
-        task
+      def create_snapshot_task(user, instance, options)
+        JobQueue.new.enqueue(user, Jobs::CreateSnapshot, 'create snapshot', [instance.id, options])
+      end
+
+      def delete_deployment_snapshots_task(user, deployment)
+        JobQueue.new.enqueue(user, Jobs::DeleteDeploymentSnapshots, 'delete deployment snapshots', [deployment.name])
+      end
+
+      def delete_snapshots_task(user, snapshot_cids)
+        JobQueue.new.enqueue(user, Jobs::DeleteSnapshots, 'delete snapshot', [snapshot_cids])
       end
 
       def find_by_cid(deployment, snapshot_cid)
@@ -29,15 +31,19 @@ module Bosh::Director
         filter[:job] = job if job
         filter[:index] = index if index
 
-        result = {}
+        result = []
         instances = Models::Instance.filter(filter).all
 
         instances.each do |instance|
           instance.persistent_disks.each do |disk|
             disk.snapshots.each do |snapshot|
-              result[instance.job] ||= {}
-              result[instance.job][instance.index] ||= []
-              result[instance.job][instance.index] << snapshot.snapshot_cid
+              result << {
+                  'job' => instance.job,
+                  'index' => instance.index,
+                  'snapshot_cid' => snapshot.snapshot_cid,
+                  'created_at' => snapshot.created_at.to_s,
+                  'clean' => snapshot.clean
+              }
             end
           end
         end
@@ -52,18 +58,36 @@ module Bosh::Director
         end
       end
 
-      def self.take_snapshot(instance, options)
+      def self.take_snapshot(instance, options={})
+        unless Config.enable_snapshots
+          Config.logger.info('Snapshots are disabled; skipping')
+          return []
+        end
+
         clean = options.fetch(:clean, false)
         snapshot_cids = []
+        metadata = {
+            deployment: instance.deployment.name,
+            job: instance.job,
+            index: instance.index,
+            director_name: Config.name,
+            director_uuid: Config.uuid,
+            agent_id: instance.vm.agent_id,
+            instance_id: instance.vm_id
+        }
 
         instance.persistent_disks.each do |disk|
-          cid = Config.cloud.snapshot_disk(disk.disk_cid)
+          cid = Config.cloud.snapshot_disk(disk.disk_cid, metadata)
           snapshot = Models::Snapshot.new(persistent_disk: disk, snapshot_cid: cid, clean: clean)
           snapshot.save
           snapshot_cids << snapshot.snapshot_cid
         end
 
         snapshot_cids
+
+      rescue Bosh::Clouds::NotImplemented
+        Config.logger.info('CPI does not support disk snapshots; skipping')
+        []
       end
     end
   end

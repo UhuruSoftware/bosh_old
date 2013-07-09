@@ -26,11 +26,12 @@ end
 def mock_cloud_options
   {
     "openstack" => {
-      "auth_url" => "http://127.0.0.1:5000/v2.0/tokens",
+      "auth_url" => "http://127.0.0.1:5000/v2.0",
       "username" => "admin",
       "api_key" => "nova",
       "tenant" => "admin",
-      "region" => "RegionOne"
+      "region" => "RegionOne",
+      "state_timeout" => 0.1
     },
     "registry" => {
       "endpoint" => "localhost:42288",
@@ -50,7 +51,7 @@ end
 
 def mock_registry(endpoint = "http://registry:3333")
   registry = mock("registry", :endpoint => endpoint)
-  Bosh::OpenStackCloud::RegistryClient.stub!(:new).and_return(registry)
+  Bosh::Registry::Client.stub!(:new).and_return(registry)
   registry
 end
 
@@ -62,6 +63,7 @@ def mock_cloud(options = nil)
   addresses = double("addresses")
   snapshots = double("snapshots")
   key_pairs = double("key_pairs")
+  security_groups = double("security_groups")
 
   glance = double(Fog::Image)
   Fog::Image.stub(:new).and_return(glance)
@@ -75,6 +77,7 @@ def mock_cloud(options = nil)
   openstack.stub(:addresses).and_return(addresses)
   openstack.stub(:snapshots).and_return(snapshots)
   openstack.stub(:key_pairs).and_return(key_pairs)
+  openstack.stub(:security_groups).and_return(security_groups)
 
   Fog::Compute.stub(:new).and_return(openstack)
 

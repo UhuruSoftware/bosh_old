@@ -23,6 +23,7 @@ module Bosh
 
       DIRECTOR_PID = "director.pid"
       WORKER_PID = "worker.pid"
+      SCHEDULER_PID = "scheduler.pid"
       BLOBSTORE_PID = "blobstore.pid"
       NATS_PID = "nats.pid"
       HM_PID = "health_monitor.pid"
@@ -32,6 +33,8 @@ module Bosh
       MIGRATIONS_PATH = File.join(DIRECTOR_PATH, "db", "migrations")
 
       TESTCASE_SQLITE_DB = "director.sqlite"
+
+      attr_accessor :director_fix_stateful_nodes
 
       def pick_unique_name(name)
         @used_names ||= Set.new
@@ -99,6 +102,10 @@ module Bosh
         sandbox_path(WORKER_PID)
       end
 
+      def scheduler_pid
+        sandbox_path(SCHEDULER_PID)
+      end
+
       def blobstore_pid
         sandbox_path(BLOBSTORE_PID)
       end
@@ -126,7 +133,7 @@ module Bosh
         FileUtils.rm_rf(testcase_sqlite_db)
 
         Dir.chdir(DIRECTOR_PATH) do
-          output = `bundle exec bin/migrate -c #{director_config}`
+          output = `bin/migrate -c #{director_config}`
           unless $?.exitstatus == 0
             puts "Failed to run migration:"
             puts output
@@ -159,7 +166,6 @@ module Bosh
             sleep(0.1)
           end
         end
-
       end
 
       def reset(name)
@@ -168,6 +174,7 @@ module Bosh
         end
         puts "Reset took #{time} seconds"
       end
+
       def do_reset(name)
         kill_process(worker_pid, "QUIT")
         kill_process(director_pid)
@@ -178,10 +185,7 @@ module Bosh
 
         FileUtils.cp(@sqlite_db, testcase_sqlite_db)
 
-        name = pick_unique_name(name)
-        base_log_path = File.join(logs_path, name)
-        director_output = "#{base_log_path}.director.out"
-        worker_output = "#{base_log_path}.worker.out"
+        @name = pick_unique_name(name)
 
         FileUtils.rm_rf(blobstore_storage_dir)
         FileUtils.mkdir_p(blobstore_storage_dir)
@@ -199,8 +203,8 @@ module Bosh
         write_in_sandbox("director_test.yml", load_config_template(DIRECTOR_CONF_TEMPLATE))
         write_in_sandbox(HM_CONFIG, load_config_template(HM_CONF_TEMPLATE))
 
-        run_with_pid(%W[director -c #{director_config}], director_pid, :output => director_output)
-        run_with_pid(%W[worker -c #{director_config}], worker_pid, :output => worker_output, :env => {"QUEUE" => "*"})
+        run_with_pid(%W[director -c #{director_config}], director_pid, :output => director_output_path)
+        run_with_pid(%W[worker -c #{director_config}], worker_pid, :output => worker_output_path, :env => {"QUEUE" => "*"})
 
         tries = 0
         loop do
@@ -211,6 +215,25 @@ module Bosh
           #sleep(0.2)
           sleep(1)
         end
+      end
+
+      def director_output_path
+        "#{base_log_path}.director.out"
+      end
+
+      def worker_output_path
+        "#{base_log_path}.worker.out"
+      end
+
+      def base_log_path
+        File.join(logs_path, @name)
+      end
+
+      def reconfigure_director
+        kill_process(director_pid)
+        director_output = "#{base_log_path}.director.out"
+        write_in_sandbox("director_test.yml", load_config_template(DIRECTOR_CONF_TEMPLATE))
+        run_with_pid(%W[director -c #{director_config}], director_pid, :output => director_output)
       end
 
       def start_healthmonitor
@@ -237,6 +260,7 @@ module Bosh
 
       def stop
         kill_agents
+        kill_process(scheduler_pid)
         kill_process(worker_pid)
         kill_process(director_pid)
         kill_process(blobstore_pid)
@@ -253,6 +277,11 @@ module Bosh
 
       def start_nats
         run_with_pid(%W[nats-server -p #{nats_port}], nats_pid)
+      end
+
+      def start_scheduler
+        scheduler_output = "#{base_log_path}.scheduler.out"
+        run_with_pid(%W[director_scheduler -c #{director_config}], scheduler_pid, output: scheduler_output)
       end
 
       def stop_nats
@@ -301,9 +330,10 @@ module Bosh
       def run_with_pid(cmd_array, pidfile, opts = {})
         env = ENV.to_hash.merge(opts.fetch(:env, {}))
         output = opts.fetch(:output, :close)
+        err_output = output == :close ? output : "#{output}.err"
 
         unless process_running?(pidfile)
-          pid = Process.spawn(env, *cmd_array, out: output, err: output, in: :close)
+          pid = Process.spawn(env, *cmd_array, out: output, err: err_output, in: :close)
 
           Process.detach(pid)
           File.open(pidfile, "w") { |f| f.write(pid) }

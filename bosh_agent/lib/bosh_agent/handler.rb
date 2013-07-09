@@ -3,6 +3,8 @@
 module Bosh::Agent
 
   class Handler
+    include Bosh::Exec
+
     attr_accessor :nats
     attr_reader :processors
 
@@ -13,9 +15,9 @@ module Bosh::Agent
     MAX_NATS_RETRIES = 10
     NATS_RECONNECT_SLEEP = 0.5
 
-    # Seconds after an unexpected error until we kill the agent so it can be
-    # restarted.
-    KILL_AGENT_THREAD_TIMEOUT = 15
+    # Seconds  until we kill the agent so it can be restarted:
+    KILL_AGENT_THREAD_TIMEOUT_ON_ERRORS = 15 # When there's an unexpected error
+    KILL_AGENT_THREAD_TIMEOUT_ON_RESTART = 1 # When we force a restart 
 
     def initialize
       @agent_id  = Config.agent_id
@@ -88,6 +90,7 @@ module Bosh::Agent
           else
             @logger.debug("SMTP: #{@smtp_password}")
             @processor = Bosh::Agent::AlertProcessor.start("127.0.0.1", @smtp_port, @smtp_user, @smtp_password)
+            setup_syslog_monitor
           end
         end
       end
@@ -130,6 +133,10 @@ module Bosh::Agent
       else
         @logger.warn("SSH is disabled")
       end
+    end
+
+    def setup_syslog_monitor
+      Bosh::Agent::SyslogMonitor.start(@nats, @agent_id)
     end
 
     def handle_message(json)
@@ -237,7 +244,7 @@ module Bosh::Agent
       # of generating an exception
       if json.bytesize < NATS_MAX_PAYLOAD_SIZE
         EM.next_tick do
-          @nats.publish(reply_to, json, blk)
+          @nats.publish(reply_to, json, &blk)
         end
       else
         msg = "message > NATS_MAX_PAYLOAD, stored in blobstore"
@@ -245,7 +252,7 @@ module Bosh::Agent
         exception = RemoteException.new(msg, nil, unencrypted)
         @logger.fatal(msg)
         EM.next_tick do
-          @nats.publish(reply_to, exception.to_hash, blk)
+          @nats.publish(reply_to, exception.to_hash, &blk)
         end
       end
     end
@@ -279,7 +286,7 @@ module Bosh::Agent
         @logger.info("#{e.inspect}: #{e.backtrace}")
         return RemoteException.from(e).to_hash
       rescue Exception => e
-        kill_main_thread_in(KILL_AGENT_THREAD_TIMEOUT)
+        kill_main_thread_in(KILL_AGENT_THREAD_TIMEOUT_ON_ERRORS)
         @logger.error("#{e.inspect}: #{e.backtrace}")
         return {:exception => "#{e.inspect}: #{e.backtrace}"}
       end
@@ -289,6 +296,15 @@ module Bosh::Agent
       SecureRandom.uuid
     end
 
+    ##
+    # When there's a network change on an existing vm, director sends a prepare_network_change message to the vm      
+    # agent. After agent replies to director with a `true` message, the post_prepare_network_change method is called
+    # (via EM callback).
+    #
+    # The post_prepare_network_change  method will delete the udev network persistent rules, delete the agent settings 
+    # and then it should restart the agent to get the new agent settings (set by director-cpi). For a simple network 
+    # change (i.e. dns changes) this is enough, as when the agent is restarted it will apply the new network settings. 
+    # But for other network changes (i.e. IP change), the CPI will be responsible to reboot or recreate the vm if needed.    
     def post_prepare_network_change
       if Bosh::Agent::Config.configure
         udev_file = '/etc/udev/rules.d/70-persistent-net.rules'
@@ -301,8 +317,8 @@ module Bosh::Agent
         File.delete(settings_file)
       end
 
-      @logger.info("Halt after networking change")
-      `/sbin/halt`
+      @logger.info("Restarting agent to prepare for a network change")
+      kill_main_thread_in(KILL_AGENT_THREAD_TIMEOUT_ON_RESTART)
     end
 
     def handle_shutdown(reply_to)

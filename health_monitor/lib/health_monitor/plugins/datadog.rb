@@ -7,29 +7,31 @@ module Bosh::HealthMonitor
       NORMAL_PRIORITY = [:alert, :critical, :error]
 
       def validate_options
-        options.kind_of?(Hash) &&
-            options["api_key"] &&
-            options["application_key"]
+        !!(options.kind_of?(Hash) && options["api_key"] && options["application_key"])
       end
 
       def run
         @api_key = options["api_key"]
         @application_key = options["application_key"]
+        @pagerduty_service_name = options["pagerduty_service_name"]
+
         logger.info("DataDog plugin is running...")
       end
 
       def dog_client
-        @dog_client ||= Dogapi::Client.new(@api_key, @application_key)
+        return @dog_client if @dog_client
+        client = Dogapi::Client.new(@api_key, @application_key)
+        @dog_client = @pagerduty_service_name ? PagingDatadogClient.new(@pagerduty_service_name, client) : client
       end
 
       def process(event)
         case event
-        when Bosh::HealthMonitor::Events::Heartbeat
-          process_heartbeat(event)
-        when Bosh::HealthMonitor::Events::Alert
-          process_alert(event)
-        else
-          #ignore
+          when Bosh::HealthMonitor::Events::Heartbeat
+            EM.defer { process_heartbeat(event) }
+          when Bosh::HealthMonitor::Events::Alert
+            EM.defer { process_alert(event) }
+          else
+            #ignore
         end
       end
 

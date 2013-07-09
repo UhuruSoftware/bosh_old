@@ -45,13 +45,14 @@ describe Bosh::Cli::Command::AWS do
     describe "aws generate bosh" do
       let(:create_vpc_output_yml) { asset "test-output.yml" }
       let(:route53_receipt_yml) { asset "test-aws_route53_receipt.yml" }
+      let(:bosh_rds_receipt_yml) { asset "test-aws_rds_bosh_receipt.yml" }
 
       it "generates required bosh deployment keys" do
         Dir.mktmpdir do |dir|
           Dir.chdir(dir) do
             aws.stub(:target_required)
             aws.stub_chain(:director, :uuid).and_return("deadbeef")
-            aws.create_bosh_manifest(create_vpc_output_yml, route53_receipt_yml)
+            aws.create_bosh_manifest(create_vpc_output_yml, route53_receipt_yml, bosh_rds_receipt_yml)
 
             yaml = Psych.load_file("bosh.yml")
 
@@ -370,7 +371,7 @@ describe Bosh::Cli::Command::AWS do
         Bosh::Aws::S3.stub(:new).and_return(fake_s3)
         fake_s3.stub(:bucket_names).and_return(["buckets of fun", "barrel of monkeys"])
 
-        aws.should_receive(:say).with("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".red)
+        aws.should_receive(:say).with("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".make_red)
         aws.should_receive(:say).with("Buckets:\n\tbuckets of fun\n\tbarrel of monkeys")
         aws.should_receive(:confirmed?).with("Are you sure you want to empty and delete all buckets?").and_return(false)
 
@@ -456,7 +457,7 @@ describe Bosh::Cli::Command::AWS do
         fake_ec2.stub(:instances_count).and_return(2)
         fake_ec2.stub(:instance_names).and_return({"I12345" => "instance_1", "I67890" => "instance_2"})
 
-        aws.should_receive(:say).with("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".red)
+        aws.should_receive(:say).with("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".make_red)
         aws.should_receive(:say).with("Instances:\n\tinstance_1 (id: I12345)\n\tinstance_2 (id: I67890)")
         aws.should_receive(:confirmed?).
             with("Are you sure you want to terminate all terminatable EC2 instances and their associated non-persistent EBS volumes?").
@@ -535,7 +536,7 @@ describe Bosh::Cli::Command::AWS do
         Bosh::Aws::EC2.stub(:new).and_return(fake_ec2)
         fake_ec2.stub(:volume_count).and_return(2)
 
-        aws.should_receive(:say).with("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".red)
+        aws.should_receive(:say).with("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".make_red)
         aws.should_receive(:say).with("It will delete 2 EBS volume(s)")
         aws.should_receive(:confirmed?).
             with("Are you sure you want to delete all unattached EBS volumes?").
@@ -602,73 +603,6 @@ describe Bosh::Cli::Command::AWS do
       end
     end
 
-    describe "aws snapshot director deployments" do
-      let(:config_file) { asset "config.yml" }
-
-      it "should snapshot EBS volumes in all deployments" do
-        bat_vm_fixtures = [
-            {"agent_id" => "a1b2", "cid" => "i-a1b2c3", "job" => "director", "index" => 0},
-            {"agent_id" => "a3b4", "cid" => "i-d4e5f6", "job" => "postgres", "index" => 0}
-        ]
-        bosh_vm_fixtures = [
-            {"agent_id" => "a1b2", "cid" => "i-g1h2i3", "job" => "director", "index" => 0}
-        ]
-
-        fake_director = mock("director", :uuid => "dir-uuid")
-        fake_ec2 = mock("ec2")
-        fake_instance_collection = mock("instance_collection")
-        fake_instance = mock("instance", :exists? => true)
-
-        fake_attachment = mock("attachment")
-
-        # Inherited from Bosh::Cli::Command::Base
-        aws.stub(
-            auth_required: true,
-            director: fake_director,
-            target: "http://1.2.3.4:56789",
-            target_url: "http://1.2.3.4:56789",
-            target_name: "http://1.2.3.4:56789"
-        )
-
-        Bosh::Aws::EC2.stub(:new).and_return(fake_ec2)
-        AWS::EC2::InstanceCollection.stub(:new).and_return(fake_instance_collection)
-        fake_ec2.should_receive(:snapshot_volume).exactly(4).times
-
-        aws.should_receive(:say).with("Creating snapshots for director `http://1.2.3.4:56789'")
-        fake_director.should_receive(:list_deployments).and_return([{"name" => "bat"}, {"name" => "bosh"}])
-
-        aws.should_receive(:say).with("  deployment: `bat'")
-        fake_director.should_receive(:list_vms).with("bat").and_return(bat_vm_fixtures)
-        fake_ec2.should_receive(:instances_for_ids).with(["i-a1b2c3", "i-d4e5f6"]).and_return(fake_instance_collection)
-        fake_instance_collection.should_receive(:[]).twice.times.and_return(fake_instance)
-
-        aws.should_receive(:say).with("    instance: `i-a1b2c3'")
-        fake_instance.should_receive(:block_device_mappings).
-            and_return({"/dev/sda" => fake_attachment, "/dev/sdb" => fake_attachment})
-        aws.should_receive(:say).with("      volume: `v-a1b2c3' device: `/dev/sda'")
-        fake_attachment.should_receive(:volume).twice.and_return(mock_volume("v-a1b2c3"))
-        aws.should_receive(:say).with("      volume: `v-a4b5c6' device: `/dev/sdb'")
-        fake_attachment.should_receive(:volume).twice.and_return(mock_volume("v-a4b5c6"))
-
-        aws.should_receive(:say).with("    instance: `i-d4e5f6'")
-        fake_instance.should_receive(:block_device_mappings).and_return({"/dev/sdc" => fake_attachment})
-        aws.should_receive(:say).with("      volume: `v-d4e5f6' device: `/dev/sdc'")
-        fake_attachment.should_receive(:volume).twice.and_return(mock_volume("v-d4e5f6"))
-
-        aws.should_receive(:say).with("  deployment: `bosh'")
-        fake_director.should_receive(:list_vms).with("bosh").and_return(bosh_vm_fixtures)
-        fake_ec2.should_receive(:instances_for_ids).with(["i-g1h2i3"]).and_return(fake_instance_collection)
-        fake_instance_collection.should_receive(:[]).and_return(fake_instance)
-
-        aws.should_receive(:say).with("    instance: `i-g1h2i3'")
-        fake_instance.should_receive(:block_device_mappings).and_return({"/dev/sdd" => fake_attachment})
-        aws.should_receive(:say).with("      volume: `v-g1h2i3' device: `/dev/sdd'")
-        fake_attachment.should_receive(:volume).twice.and_return(mock_volume("v-g1h2i3"))
-
-        aws.snapshot_deployments(config_file)
-      end
-    end
-
     describe "aws delete_all rds databases" do
       let(:config_file) { asset "config.yml" }
 
@@ -682,7 +616,7 @@ describe Bosh::Cli::Command::AWS do
 
         Bosh::Aws::RDS.stub(:new).and_return(fake_rds)
 
-        aws.should_receive(:say).with("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".red)
+        aws.should_receive(:say).with("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".make_red)
         aws.should_receive(:say).
             with("Database Instances:\n\tinstance1\t(database_name: bosh_db)\n\tinstance2\t(database_name: important_db)")
         aws.should_receive(:confirmed?).with("Are you sure you want to delete all databases?").
@@ -701,6 +635,12 @@ describe Bosh::Cli::Command::AWS do
         }.to raise_error(Bosh::Cli::CliError, "21 instance(s) running.  This isn't a dev account (more than 20) please make sure you want to do this, aborting.")
       end
 
+      def mock_deletes(fake_rds)
+        fake_rds.should_receive :delete_subnet_groups
+        fake_rds.should_receive :delete_security_groups
+        fake_rds.should_receive :delete_db_parameter_group
+      end
+
       it "should delete db_subnets when dbs don't exist" do
         fake_ec2 = mock("ec2")
         Bosh::Aws::EC2.stub(:new).and_return(fake_ec2)
@@ -709,9 +649,10 @@ describe Bosh::Cli::Command::AWS do
         fake_rds = mock("rds")
         fake_rds.should_receive(:database_names).and_return([])
         fake_rds.should_receive(:databases).and_return([])
-        fake_rds.should_not_receive(:delete_databases)
-        fake_rds.should_receive(:delete_subnet_groups)
-        fake_rds.should_receive(:delete_security_groups)
+
+
+        mock_deletes(fake_rds)
+
         Bosh::Aws::RDS.stub(:new).and_return(fake_rds)
 
         aws.should_receive(:confirmed?).with("Are you sure you want to delete all databases?").
@@ -734,12 +675,12 @@ describe Bosh::Cli::Command::AWS do
             Bosh::Aws::RDS.stub(:new).and_return(fake_rds)
             aws.stub(:say).twice
             aws.stub(:confirmed?).and_return(true)
+
             fake_rds.stub(:database_names).and_return(%w[foo bar])
             fake_rds.stub(:databases).and_return([])
+            mock_deletes(fake_rds)
 
             fake_rds.should_receive :delete_databases
-            fake_rds.should_receive :delete_subnet_groups
-            fake_rds.should_receive :delete_security_groups
 
             aws.send(:delete_all_rds_dbs, config_file)
           end
@@ -789,9 +730,9 @@ describe Bosh::Cli::Command::AWS do
 
               ::Bosh::Cli::Command::Base.any_instance.stub(:non_interactive?).and_return(true)
 
+              mock_deletes(fake_rds)
+
               fake_rds.should_receive :delete_databases
-              fake_rds.should_receive :delete_subnet_groups
-              fake_rds.should_receive :delete_security_groups
 
               aws.send(:delete_all_rds_dbs, config_file)
             end
@@ -814,6 +755,7 @@ describe Bosh::Cli::Command::AWS do
           fake_rds.should_receive :delete_databases
           fake_rds.should_receive :delete_subnet_groups
           fake_rds.should_receive :delete_security_groups
+          fake_rds.should_receive :delete_db_parameter_group
 
           ::Bosh::Cli::Command::Base.any_instance.stub(:non_interactive?).and_return(true)
           aws.send(:delete_all_rds_dbs, config_file)
@@ -853,6 +795,50 @@ describe Bosh::Cli::Command::AWS do
         fake_elb.should_receive(:names).and_return(%w(one two))
         aws.should_receive(:confirmed?).and_return(true)
         aws.send(:delete_all_elbs, config_file)
+      end
+    end
+
+    describe "aws bootstrap micro" do
+      subject(:aws) { described_class.new }
+      let(:fake_bootstrap) { double("micro bosh bootstrap") }
+      context "interative" do
+        before(:each) do
+          aws.options[:non_interactive] = false
+        end
+
+        it "prompts the user for admin password" do
+          fake_bootstrap.should_receive(:start)
+          Bosh::Aws::MicroBoshBootstrap.should_receive(:new).with(
+              anything,
+              kind_of(Hash)
+          ).and_return(fake_bootstrap)
+          aws.should_receive(:ask).and_return("username")
+          aws.should_receive(:ask).and_return("password")
+
+          fake_bootstrap.should_receive(:create_user).with("hm", anything).ordered
+          fake_bootstrap.should_receive(:create_user).with("username", "password").ordered
+
+          aws.bootstrap_micro
+        end
+      end
+
+      context "non-interactive" do
+        before(:each) do
+          aws.options[:non_interactive] = true
+        end
+
+        it "saves the randomly generated password??" do
+          fake_bootstrap.should_receive(:start)
+          Bosh::Aws::MicroBoshBootstrap.should_receive(:new).with(
+              anything,
+              kind_of(Hash)
+          ).and_return(fake_bootstrap)
+
+          fake_bootstrap.should_receive(:create_user).with("hm", anything).ordered
+          fake_bootstrap.should_receive(:create_user).with("admin", anything).ordered
+
+          aws.bootstrap_micro
+        end
       end
     end
   end

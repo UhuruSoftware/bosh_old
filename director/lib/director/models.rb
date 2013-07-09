@@ -1,4 +1,5 @@
 # Copyright (c) 2009-2012 VMware, Inc.
+#
 
 require 'director/models/compiled_package'
 require 'director/models/deployment'
@@ -16,6 +17,7 @@ require 'director/models/template'
 require 'director/models/user'
 require 'director/models/vm'
 require 'director/models/persistent_disk'
+require 'director/models/director_attribute'
 
 module Bosh::Director
   module Models

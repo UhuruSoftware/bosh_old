@@ -18,8 +18,10 @@ module IntegrationExampleGroup
   def run_bosh(cmd, work_dir = nil, options = {})
     failure_expected = options.fetch(:failure_expected, false)
     Dir.chdir(work_dir || BOSH_WORK_DIR) do
-      output = `bosh -n -c #{BOSH_CONFIG} -C #{BOSH_CACHE_DIR} #{cmd} 2>&1`
+      command = "bosh -n -c #{BOSH_CONFIG} -C #{BOSH_CACHE_DIR} #{cmd}"
+      output = `#{command} 2>&1`
       if $?.exitstatus != 0 && !failure_expected
+        puts command
         puts output
       end
       output
@@ -50,6 +52,36 @@ module IntegrationExampleGroup
 
   def expect_output(cmd, expected_output)
     format_output(run_bosh(cmd)).should == format_output(expected_output)
+  end
+
+  def get_vms
+    output = run_bosh("vms --details")
+    table = output.lines.grep(/\|/)
+
+    table = table.map { |line| line.split('|').map(&:strip).reject(&:empty?) }
+    headers = table.shift || []
+    headers.map! do |header|
+      header.downcase.tr('/ ', '_').to_sym
+    end
+    output = []
+    table.each do |row|
+      output << Hash[headers.zip(row)]
+    end
+    output
+  end
+
+  def wait_for_vm(name)
+    5.times do
+      vm = get_vms.detect { |v| v[:job_index] == name }
+      return vm if vm
+    end
+    nil
+  end
+
+  def kill_job_agent(name)
+    vm = get_vms.detect { |v| v[:job_index] == name }
+    Process.kill('INT', vm[:cid].to_i)
+    vm[:cid]
   end
 
   def self.included(base)

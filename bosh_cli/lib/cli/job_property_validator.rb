@@ -54,7 +54,14 @@ module Bosh::Cli
 
     def validate
       @manifest["jobs"].each do |job_spec|
-        validate_templates(job_spec)
+        # TODO: this should be refactored, but it works for jobs
+        # with multiple job templates (colocated)
+        job_templates = Array(job_spec['template'])
+        job_templates.each do |job_template|
+          job_spec_for_template = job_spec.dup
+          job_spec_for_template['template'] = job_template
+          validate_templates(job_spec_for_template)
+        end
       end
     end
 
@@ -75,19 +82,28 @@ module Bosh::Cli
       # networks and properties.
       # TODO: provide all keys in the spec?
       spec = {
-        "job" => {
-          "name" => job_spec["name"]
+        'job' => {
+            'name' => job_spec['name']
         },
-        "networks" => {
-          "default" => {"ip" => "10.0.0.1"}
-        },
-        "properties" => collection.to_hash,
-        "index" => 0
+        'index' => 0,
+        'networks' => job_network_spec(job_spec),
+        'properties' => collection.to_hash
       }
 
       built_job.all_templates.each do |template_path|
         # TODO: add progress bar?
         evaluate_template(built_job, template_path, spec)
+      end
+    end
+
+    def job_network_spec(job_spec)
+      job_spec['networks'].reduce({}) do |networks, network|
+        networks[network['name']] = {
+            'ip' => '127.0.0.1', # faking the IP since it shouldn't affect logic
+            'netmask' => '255.255.255.0',
+            'gateway' => '127.0.0.2'
+        }
+        networks
       end
     end
 

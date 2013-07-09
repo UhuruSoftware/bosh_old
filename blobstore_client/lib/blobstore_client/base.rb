@@ -75,26 +75,41 @@ module Bosh
         object_exists?(oid)
       end
 
+      # @return [Array]
+      def list
+        list_objects
+      end
+
       protected
 
+      # @return [String] the id
       def create_file(id, file)
         # needs to be implemented in each subclass
-        raise "#create not implemented"
+        not_supported
       end
 
       def get_file(id, file)
         # needs to be implemented in each subclass
-        raise "#get not implemented"
+        not_supported
       end
 
       def delete_object(oid)
         # needs to be implemented in each subclass
-        raise "#delete not implemented"
+        not_supported
       end
 
       def object_exists?(oid)
         # needs to be implemented in each subclass
-        raise "#exists? not implemented"
+        not_supported
+      end
+
+      # Optional; if not supported, blobstore will not be backed up
+      def list_objects
+        not_supported
+      end
+
+      def generate_object_id
+        SecureRandom.uuid
       end
 
       def temp_path
@@ -107,6 +122,11 @@ module Bosh
         end
       end
 
+      private
+
+      def not_supported
+        raise NotImplemented, "not supported by this blobstore"
+      end
     end
   end
 end

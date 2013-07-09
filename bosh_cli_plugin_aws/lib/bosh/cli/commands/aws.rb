@@ -31,6 +31,8 @@ module Bosh::Cli::Command
       bootstrap = Bosh::Aws::MicroBoshBootstrap.new(runner, options)
       bootstrap.start
 
+      bootstrap.create_user(options[:hm_director_user], options[:hm_director_password])
+
       if interactive?
         username = ask("Enter username: ")
         password = ask("Enter password: ") { |q| q.echo = "*" }
@@ -43,21 +45,19 @@ module Bosh::Cli::Command
       else
         bootstrap.create_user("admin", SecureRandom.base64)
       end
-
-      bootstrap.create_user(options[:hm_director_user], options[:hm_director_password])
     end
 
     usage "aws bootstrap bosh"
     desc "bootstrap full bosh deployment"
-    def bootstrap_bosh(bosh_repository=nil)
+    def bootstrap_bosh(config_file = nil)
       target_required
       err "To bootstrap BOSH, first log in to `#{config.target}'" unless logged_in?
 
       options[:hm_director_user] ||= 'hm'
       options[:hm_director_password] = SecureRandom.base64
 
-      bootstrap = Bosh::Aws::BoshBootstrap.new(director, self.options)
-      bootstrap.start(bosh_repository)
+      bootstrap = Bosh::Aws::BoshBootstrap.new(director, s3(config_file), self.options)
+      bootstrap.start
 
       say "For security purposes, please provide a username and password for BOSH Director"
       username = ask("Enter username: ")
@@ -88,7 +88,7 @@ module Bosh::Cli::Command
 
     usage "aws generate bosh"
     desc "generate bosh.yml deployment manifest"
-    def create_bosh_manifest(vpc_receipt_file, route53_receipt_file)
+    def create_bosh_manifest(vpc_receipt_file, route53_receipt_file, bosh_rds_receipt_file)
       target_required
 
       options[:hm_director_user] ||= 'hm'
@@ -96,12 +96,13 @@ module Bosh::Cli::Command
 
       vpc_config = load_yaml_file(vpc_receipt_file)
       route53_config = load_yaml_file(route53_receipt_file)
-      bosh_manifest = Bosh::Aws::BoshManifest.new(vpc_config, route53_config, director.uuid, options)
+      bosh_rds_config = load_yaml_file(bosh_rds_receipt_file)
+      bosh_manifest = Bosh::Aws::BoshManifest.new(vpc_config, route53_config, director.uuid, bosh_rds_config, options)
 
       write_yaml(bosh_manifest, bosh_manifest.file_name)
     end
 
-    usage "aws generate bat_manifest"
+    usage "aws generate bat"
     desc "generate bat.yml"
     def create_bat_manifest(vpc_receipt_file, route53_receipt_file, stemcell_version)
       target_required
@@ -111,45 +112,6 @@ module Bosh::Cli::Command
       manifest = Bosh::Aws::BatManifest.new(vpc_config, route53_config, stemcell_version, director.uuid)
 
       write_yaml(manifest, manifest.file_name)
-    end
-
-    usage "aws snapshot deployments"
-    desc "snapshot all EBS volumes in all deployments"
-    def snapshot_deployments(config_file)
-      auth_required
-      config = load_config(config_file)
-
-      say("Creating snapshots for director `#{target_name}'")
-      ec2 = Bosh::Aws::EC2.new(config["aws"])
-
-      deployments = director.list_deployments.map { |d| d["name"] }
-      deployments.each do |deployment|
-        say("  deployment: `#{deployment}'")
-        vms = director.list_vms(deployment)
-        instances = ec2.instances_for_ids(vms.map { |vm| vm["cid"] })
-        vms.each do |vm|
-          instance_id = vm["cid"]
-          instance = instances[instance_id]
-          unless instance.exists?
-            say("    ERROR: instance `#{instance_id}' not found on EC2")
-          else
-            say("    instance: `#{instance_id}'")
-            instance.block_device_mappings.each do |device_path, attachment|
-              say("      volume: `#{attachment.volume.id}' device: `#{device_path}'")
-              device_name = device_path.match("/dev/(.*)")[1]
-              snapshot_name = [deployment, vm['job'], vm['index'], device_name].join('/')
-              vm_metadata = JSON.unparse(vm)
-              tags = {
-                  "device" => device_path,
-                  "bosh_data" => vm_metadata,
-                  "director_uri" => target_url,
-                  "director_uuid" => director.uuid
-              }
-              ec2.snapshot_volume(attachment.volume, snapshot_name, vm_metadata, tags)
-            end
-          end
-        end
-      end
     end
 
     usage "aws create"
@@ -205,6 +167,11 @@ module Bosh::Cli::Command
 
     private
 
+    def s3(config_file)
+      config = load_config(config_file)
+      Bosh::Aws::S3.new(config["aws"])
+    end
+
     def delete_vpc(details_file)
       details = load_yaml_file details_file
 
@@ -242,7 +209,7 @@ module Bosh::Cli::Command
         true # retryable block must yield true if we only want to retry on Exceptions
       end
 
-      say "deleted VPC and all dependencies".green
+      say "deleted VPC and all dependencies".make_green
     end
 
     def delete_all_vpcs(config_file)
@@ -253,7 +220,7 @@ module Bosh::Cli::Command
       dhcp_options = []
 
       unless vpc_ids.empty?
-        say("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".red)
+        say("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".make_red)
         say("VPCs:\n\t#{vpc_ids.join("\n\t")}")
 
         if confirmed?("Are you sure you want to delete all VPCs?")
@@ -306,7 +273,7 @@ module Bosh::Cli::Command
       bucket_names = s3.bucket_names
 
       unless bucket_names.empty?
-        say("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".red)
+        say("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".make_red)
         say("Buckets:\n\t#{bucket_names.join("\n\t")}")
 
         s3.empty if confirmed?("Are you sure you want to empty and delete all buckets?")
@@ -323,13 +290,13 @@ module Bosh::Cli::Command
 
       formatted_names = ec2.instance_names.map { |id, name| "#{name} (id: #{id})" }
       unless formatted_names.empty?
-        say("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".red)
+        say("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".make_red)
         say("Instances:\n\t#{formatted_names.join("\n\t")}")
 
         if confirmed?("Are you sure you want to terminate all terminatable EC2 instances and their associated non-persistent EBS volumes?")
           say "Terminating instances and waiting for them to die..."
           if !ec2.terminate_instances
-            say "Warning: instances did not terminate yet after 100 retries".red
+            say "Warning: instances did not terminate yet after 100 retries".make_red
           end
         end
       else
@@ -367,7 +334,7 @@ module Bosh::Cli::Command
 
       formatted_names = rds.database_names.map { |instance, db| "#{instance}\t(database_name: #{db})" }
 
-      say("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".red)
+      say("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".make_red)
       say("Database Instances:\n\t#{formatted_names.join("\n\t")}")
 
       if confirmed?("Are you sure you want to delete all databases?")
@@ -376,6 +343,7 @@ module Bosh::Cli::Command
 
         delete_all_rds_subnet_groups(config_file)
         delete_all_rds_security_groups(config_file)
+        rds.delete_db_parameter_group('utf8')
       end
     end
 
@@ -400,7 +368,7 @@ module Bosh::Cli::Command
       check_volume_count(config)
 
       if ec2.volume_count > 0
-        say("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".red)
+        say("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".make_red)
         say("It will delete #{ec2.volume_count} EBS volume(s)")
 
         ec2.delete_volumes if confirmed?("Are you sure you want to delete all unattached EBS volumes?")
@@ -427,7 +395,7 @@ module Bosh::Cli::Command
       config = load_config(config_file)
       route53 = Bosh::Aws::Route53.new(config["aws"])
 
-      say("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".red)
+      say("THIS IS A VERY DESTRUCTIVE OPERATION AND IT CANNOT BE UNDONE!\n".make_red)
 
       omit_types = options[:omit_types] || %w[NS SOA]
       if omit_types.empty?

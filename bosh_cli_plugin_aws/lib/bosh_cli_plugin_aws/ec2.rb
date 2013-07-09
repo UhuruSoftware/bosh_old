@@ -2,8 +2,6 @@ module Bosh
   module Aws
     class EC2
 
-      MAX_TAG_KEY_LENGTH = 127
-      MAX_TAG_VALUE_LENGTH = 255
       NAT_AMI_ID = "ami-f619c29f"
 
       attr_reader :elastic_ips
@@ -29,7 +27,7 @@ module Bosh
         count.times do
           @elastic_ips << allocate_elastic_ip.public_ip
         end
-        #say "\tallocated #{eip.public_ip}".green
+        #say "\tallocated #{eip.public_ip}".make_green
       end
 
       def allocate_elastic_ip
@@ -126,10 +124,6 @@ module Bosh
         end
       end
 
-      def instances_for_ids(ids)
-        aws_ec2.instances.filter('instance-id', *ids)
-      end
-
       def delete_volumes
         unattached_volumes.each do |vol|
           begin
@@ -142,13 +136,6 @@ module Bosh
 
       def volume_count
         unattached_volumes.count
-      end
-
-      def snapshot_volume(volume, snapshot_name, description = "", tags = {})
-        snap = volume.create_snapshot(description.to_s)
-        tag(snap, 'Name', snapshot_name)
-        tags.each_pair { |key, value| tag(snap, key.to_s, value) }
-        snap
       end
 
       def add_key_pair(name, path_to_public_private_key)
@@ -182,7 +169,7 @@ module Bosh
       def remove_key_pair(name)
         key_pair = key_pair_by_name(name)
         key_pair.delete unless key_pair.nil?
-        Bosh::Common.retryable(tries: 15, sleep: lambda{|n,e| [2**(n-1), 10].min}) do
+        Bosh::Common.retryable(tries: 15) do
           key_pair_by_name(name).nil?
         end
       end
@@ -190,7 +177,7 @@ module Bosh
       def remove_all_key_pairs
         aws_ec2.key_pairs.each(&:delete)
 
-        Bosh::Common.retryable(tries: 10, sleep: lambda{|n,e| [2**(n-1), 10].min}) do
+        Bosh::Common.retryable(tries: 10) do
           aws_ec2.key_pairs.to_a.empty?
         end
       end
@@ -243,14 +230,6 @@ module Bosh
         # only check volumes that don't have status 'deleting' and 'deleted'
         aws_ec2.volumes.filter('status', %w[available creating in_use error]).
             reject { |v| v.attachments.any? }
-      end
-
-      def tag(taggable, key, value)
-        trimmed_key = key[0..(MAX_TAG_KEY_LENGTH - 1)]
-        trimmed_value = value[0..(MAX_TAG_VALUE_LENGTH - 1)]
-        taggable.add_tag(trimmed_key, :value => trimmed_value)
-      rescue AWS::EC2::Errors::InvalidParameterValue => e
-        say("could not tag #{taggable.id}: #{e.message}")
       end
 
       def select_key_pair_for_instance(name, key_pair)

@@ -1,12 +1,66 @@
 require 'spec_helper'
 
 describe Bhm::Plugins::DataDog do
-  subject { described_class.new("api_key" => "api_key", "application_key" => "application_key") }
+  let(:options) { { "api_key" => "api_key", "application_key" => "application_key" } }
+  subject { described_class.new(options) }
+
   let(:dog_client) { double("DataDog Client") }
+
   before do
     subject.stub(dog_client: dog_client)
+    Bhm.stub(:logger => stub.as_null_object)
   end
 
+  describe "validating the options" do
+    context "when we specify both the api keu and the application key" do
+      it "is valid" do
+        subject.validate_options.should == true
+      end
+    end
+
+    context "when we omit the application key " do
+      let(:options) { { "api_key" => "api_key" } }
+
+      it "is not valid" do
+        subject.validate_options.should == false
+      end
+    end
+
+    context "when we omit the api key " do
+      let(:options) { { "application_key" => "application_key" } }
+
+      it "is not valid" do
+        subject.validate_options.should == false
+      end
+    end
+  end
+
+  describe "creating a data dog client" do
+    before do
+      datadog_plugin.run
+    end
+
+    let(:datadog_plugin) { described_class.new(options) }
+    let(:client) { datadog_plugin.dog_client }
+
+    context "when we specify the pager duty service name" do
+      let(:options) { { "api_key" => "api_key", "application_key" => "application_key", "pagerduty_service_name" => "pdsn" } }
+
+      it "creates a paging client" do
+        client.should be_a PagingDatadogClient
+      end
+
+      it "has the correct pager duty service name" do
+        client.datadog_recipient.should == "pdsn"
+      end
+    end
+
+    context "when we do not specify the pager duty service name" do
+      it "creates a regular client" do
+        client.should be_a Dogapi::Client
+      end
+    end
+  end
 
   context "processing metrics" do
     it "sends datadog metrics" do
@@ -19,6 +73,7 @@ describe Bhm::Plugins::DataDog do
       time = Time.now
       dog_client.should_receive(:emit_points).with("bosh.healthmonitor.system.load.1m", [[Time.at(time.to_i) ,0.2]], tags: tags)
 
+      EM.should_receive(:defer).and_yield
       %w[
         cpu.user
         cpu.sys
@@ -42,6 +97,8 @@ describe Bhm::Plugins::DataDog do
 
   context "processing alerts" do
     it "sends datadog alerts" do
+      EM.should_receive(:defer).and_yield
+
       time = Time.now.to_i - 10
       fake_event = double("Datadog Event")
       Dogapi::Event.should_receive(:new).with do |msg, options|
@@ -59,6 +116,8 @@ describe Bhm::Plugins::DataDog do
     end
 
     it "sends datadog a low priority event for warning alerts" do
+      EM.should_receive(:defer).and_yield
+
       Dogapi::Event.should_receive(:new).with do |_, options|
         options[:priority].should == "low"
       end

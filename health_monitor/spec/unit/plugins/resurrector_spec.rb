@@ -37,8 +37,16 @@ describe Bhm::Plugins::Resurrector do
 
     context 'alerts with deployment, job and index' do
       let(:alert) { Bhm::Events::Base.create!(:alert, alert_payload(deployment: 'd', job: 'j', index: 'i')) }
+      let (:event_processor) { Bhm::EventProcessor.new }
+
+      before do
+        Bhm.event_processor = event_processor
+        @don = mock(Bhm::Plugins::ResurrectorHelper::AlertTracker, record: nil)
+        Bhm::Plugins::ResurrectorHelper::AlertTracker.should_receive(:new).and_return(@don)
+      end
 
       it 'should be delivered' do
+        @don.should_receive(:melting_down?).and_return(false)
         plugin.run
 
         request_url = "#{uri}/deployments/d/scan_and_fix"
@@ -51,6 +59,27 @@ describe Bhm::Plugins::Resurrector do
         }
         plugin.should_receive(:send_http_put_request).with(request_url, request_data)
 
+        plugin.process(alert)
+      end
+
+      it 'does not deliver while melting down' do
+        @don.should_receive(:melting_down?).and_return(true)
+        plugin.run
+        plugin.should_not_receive(:send_http_put_request)
+        plugin.process(alert)
+      end
+
+      it 'should alert through EventProcessor while melting down' do
+        @don.should_receive(:melting_down?).and_return(true)
+        Time.stub(:now).and_return(12345)
+        alert_option = {
+            :severity => 1,
+            :source => "HM plugin resurrector",
+            :title => "We are in meltdown.",
+            :created_at => 12345
+        }
+        event_processor.should_receive(:process).with(:alert, alert_option)
+        plugin.run
         plugin.process(alert)
       end
     end

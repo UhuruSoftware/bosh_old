@@ -7,8 +7,11 @@ module Bosh::HealthMonitor
 
     attr_accessor :processor
 
-    def initialize
+    def initialize(event_processor)
+      # hash of agent id to agent structure (see add_agent())
       @agents = { }
+
+      # hash of deployment name to set of agent ids
       @deployments = { }
 
       @logger = Bhm.logger
@@ -16,7 +19,13 @@ module Bosh::HealthMonitor
       @alerts_received = 0
       @alerts_processed = 0
 
-      @processor = EventProcessor.new
+      @processor = event_processor
+    end
+
+    # Get a hash of agent id -> agent object for all agents associated with the deployment
+    def get_agents_for_deployment(deployment_name)
+      agent_ids = @deployments[deployment_name]
+      @agents.select { |key, value| agent_ids.include?(key) }
     end
 
     def lookup_plugin(name, options = {})

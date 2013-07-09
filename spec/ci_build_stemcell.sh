@@ -1,9 +1,8 @@
 #!/bin/bash --login
 
 set -e
-source .rvmrc
 
-rm -f *.tgz stemcell-ami.txt
+rm -f *.tgz
 
 if [ $1 == 'micro' ]
 then
@@ -31,7 +30,7 @@ fi
 WORK_PATH=$directory/work \
     BUILD_PATH=$directory/build \
     STEMCELL_VERSION=$BUILD_ID \
-    $WORKSPACE/spec/ci_build.sh stemcell:$task[$infrastructure]
+    $WORKSPACE/spec/ci_build.sh ci:stemcell:$task[$infrastructure]
 
 files=$(ls $directory/work/work/*.tgz 2> /dev/null || wc -l)
 if [ "$files" != "0" ]; then
@@ -41,6 +40,6 @@ if [ "$files" != "0" ]; then
     cp $stemcell $WORKSPACE/$stemcell_base.tgz
 
     if [ $infrastructure == 'aws' ]; then
-        bundle exec $(dirname $0)/publish_ami.rb $WORKSPACE/$stemcell_base.tgz
+        bundle exec rake artifacts:candidates:publish[$WORKSPACE/$stemcell_base.tgz]
     fi
 fi

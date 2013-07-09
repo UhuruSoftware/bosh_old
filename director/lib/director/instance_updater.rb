@@ -51,8 +51,7 @@ module Bosh::Director
     def update(options = {})
       @canary = options.fetch(:canary, false)
 
-      @logger.info("Updating instance #{@instance}, " +
-                       "changes #{@instance.changes.inspect}")
+      @logger.info("Updating instance #{@instance}, changes: #{@instance.changes.to_a.join(', ')}")
 
       # Optimization to only update DNS if nothing else changed.
       if dns_change_only?
@@ -71,9 +70,9 @@ module Bosh::Director
       end
 
       step { update_resource_pool }
-      step { update_persistent_disk }
       step { update_networks }
       step { update_dns }
+      step { update_persistent_disk }
 
       update_vm_metadata(@vm)
 
@@ -440,6 +439,10 @@ module Bosh::Director
         update_resource_pool
         return
       end
+
+      # Give some time to the agent to restart before pinging if it's ready
+      sleep(5)
+
       agent.wait_until_ready
     end
 

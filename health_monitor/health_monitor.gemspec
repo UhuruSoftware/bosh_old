@@ -6,8 +6,8 @@ Gem::Specification.new do |s|
   s.name         = "health_monitor"
   s.version      = version
   s.platform     = Gem::Platform::RUBY
-  s.summary      = "BOSH Health Montior"
-  s.description  = s.summary
+  s.summary      = "BOSH Health Monitor"
+  s.description  = "BOSH Health Monitor\n#{`git rev-parse HEAD`[0, 6]}"
   s.author       = "VMware"
   s.homepage     = 'https://github.com/cloudfoundry/bosh'
   s.license      = 'Apache 2.0'

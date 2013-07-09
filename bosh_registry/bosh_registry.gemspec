@@ -7,7 +7,7 @@ Gem::Specification.new do |s|
   s.version      = version
   s.platform     = Gem::Platform::RUBY
   s.summary      = "BOSH Registry"
-  s.description  = s.summary
+  s.description  = "BOSH Registry\n#{`git rev-parse HEAD`[0, 6]}"
   s.author       = "VMware"
   s.homepage     = 'https://github.com/cloudfoundry/bosh'
   s.license      = 'Apache 2.0'
@@ -23,6 +23,6 @@ Gem::Specification.new do |s|
   s.add_dependency "sinatra", "~>1.4.2"
   s.add_dependency "thin", "~>1.5.0"
   s.add_dependency "yajl-ruby", "~>1.1.0"
-  s.add_dependency "fog", "~>1.10.1"
+  s.add_dependency "fog", "~>1.12.1"
   s.add_dependency "aws-sdk", "1.8.5"
 end

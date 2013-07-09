@@ -8,6 +8,7 @@ describe CreateRdsDbs do
 
   before do
     subject.stub(:load_receipt).and_return(YAML.load_file(asset "test-output.yml"))
+    Kernel.stub(:sleep)
   end
 
   def make_rds!(opts = {})
@@ -121,8 +122,8 @@ describe CreateRdsDbs do
       expect { subject.execute }.to_not raise_error
     end
 
-    it "should fail after 180 attempts when not available" do
-      make_rds!(retries_needed: 181)
+    it "should fail after 540 attempts when not available" do
+      make_rds!(retries_needed: 541)
       expect { subject.execute }.to raise_error
     end
   end

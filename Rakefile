@@ -1,6 +1,6 @@
-task :default => :spec
+# encoding: UTF-8
 
-Dir.glob('rake/**/*.rake').each { |r| import r }
+task default: :spec
+
+Dir.glob('rake/lib/tasks/**/*.rake').each { |r| import r }
 require 'ci/reporter/rake/rspec'     # use this if you're using RSpec
-require_relative 'rake/helpers/rake_helpers'
-

@@ -22,7 +22,7 @@ describe "with release, stemcell and deployment" do
       Dir.mktmpdir do |tmpdir|
         ssh(static_ip, "vcap", "echo #{password} | sudo -S pkill -9 agent", ssh_options)
         # wait for agent to restart
-        sleep(5)
+        wait_for_vm('batlight/0')
         bosh("logs batlight 0 --agent --dir #{tmpdir}")
         # TODO check log for 2 agent starts (first is initial start and second is after crash)
       end
@@ -66,21 +66,20 @@ describe "with release, stemcell and deployment" do
 
   context "job" do
     it "should restart a job" do
-      bosh("restart bat 0").should succeed_with %r{bat/0 has been restarted}
+      bosh("restart batlight 0").should succeed_with %r{batlight/0 has been restarted}
       # TODO verify that the process gets a new pid
     end
 
     it "should recreate a job" do
-      bosh("recreate bat 0").should succeed_with %r{bat/0 has been recreated}
+      bosh("recreate batlight 0").should succeed_with %r{batlight/0 has been recreated}
       # TODO verify that the VM gets a new cid
     end
 
     it "should stop and start a job" do
-      bosh("stop bat 0").should succeed_with %r{bat/0 has been stopped}
-      bosh("start bat 0").should succeed_with %r{bat/0 has been started}
+      bosh("stop batlight 0").should succeed_with %r{batlight/0 has been stopped}
+      bosh("start batlight 0").should succeed_with %r{batlight/0 has been started}
       # TODO verify that the process gets a new pid
     end
-
   end
 
   context "logs" do
@@ -102,6 +101,27 @@ describe "with release, stemcell and deployment" do
     end
   end
 
+  describe "backup" do
+    after do
+      FileUtils.rm_f('bosh_backup.tgz')
+    end
+
+    it "works" do
+      bosh('backup bosh_backup.tgz').should succeed_with /Backup of BOSH director was put in/
+
+      files = tar_contents('bosh_backup.tgz', entries=true)
+
+      file_names = files.map(&:name).join(' ')
+      expect(file_names).to match(/logs\.tgz/)
+      expect(file_names).to match(/task_logs\.tgz/)
+      expect(file_names).to match(/director_db\.sql/)
+
+      files.each do |file|
+        expect(file.size).to be_> 0
+      end
+    end
+  end
+
   describe "managed properties" do
     context "with no property" do
 
@@ -119,7 +139,6 @@ describe "with release, stemcell and deployment" do
           result.output.should match /This will be a new property/
           result.output.should match /Property `newprop' set to `something'/
       end
-
     end
 
     context "with existing property" do
@@ -147,8 +166,7 @@ describe "with release, stemcell and deployment" do
       end
 
       it "should succeed when the release is valid" do
-        bosh("upload release #{previous_release.to_path}").should
-        succeed_with /Release uploaded/
+        bosh("upload release #{previous_release.to_path}").should succeed_with /Release uploaded/
       end
 
       it "should fail when the release already is uploaded" do
@@ -180,15 +198,15 @@ describe "with release, stemcell and deployment" do
         end
 
         it "should be possible to delete a different version" do
-          bosh("delete release #{previous_release.name} #{previous_release.version}").should
-          succeed_with /Deleted release/
+          results = bosh("delete release #{previous_release.name} #{previous_release.version}")
+          results.should succeed_with(/Deleted `#{previous_release.name}/)
         end
       end
 
       context "not in use" do
         it "should be possible to delete a single release" do
-          bosh("delete release #{previous_release.name} #{previous_release.version}").should
-          succeed_with /Deleted release/
+          results = bosh("delete release #{previous_release.name} #{previous_release.version}")
+          results.should succeed_with(/Deleted `#{previous_release.name}/)
           releases.should_not include(previous_release)
         end
       end
@@ -206,5 +224,4 @@ describe "with release, stemcell and deployment" do
       }
     end
   end
-
 end

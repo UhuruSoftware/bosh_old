@@ -29,7 +29,6 @@ BOSH_WORK_TEMPLATE  = File.join(ASSETS_DIR, "bosh_work_dir")
 BOSH_WORK_DIR  = File.join(SANDBOX_DIR, "bosh_work_dir")
 
 BOSH_CONFIG    = File.join(SANDBOX_DIR, "bosh_config.yml")
-#BOSH_CONFIG    = File.join(ASSETS_DIR, "bosh_config.yml")
 
 STDOUT.sync = true
 
@@ -38,6 +37,7 @@ module Bosh
     module IntegrationTest
       class CliUsage; end
       class HealthMonitor; end
+      class DirectorScheduler; end
     end
   end
 end

@@ -33,6 +33,30 @@ module BoshHelper
     result
   end
 
+  def get_vms
+    output = bosh("vms --details").output
+    table = output.lines.grep(/\|/)
+
+    table = table.map { |line| line.split('|').map(&:strip).reject(&:empty?) }
+    headers = table.shift || []
+    headers.map! do |header|
+      header.downcase.tr('/ ', '_').to_sym
+    end
+    output = []
+    table.each do |row|
+      output << Hash[headers.zip(row)]
+    end
+    output
+  end
+
+  def wait_for_vm(name)
+    5.times do
+      vm = get_vms.detect { |v| v[:job_index] == name }
+      return vm if vm
+    end
+    nil
+  end
+
   def self.bosh_cli_config_path
     @bosh_cli_config_tempfile ||= Tempfile.new("bosh_config")
     @bosh_cli_config_tempfile.path
@@ -192,11 +216,13 @@ module BoshHelper
     Dir.glob("*.tgz").first
   end
 
-  def tar_contents(tgz)
+  def tar_contents(tgz, entries=false)
     list = []
     tar = Zlib::GzipReader.open(tgz)
     Minitar.open(tar).each do |entry|
-      list << entry.name if entry.file?
+      is_file = entry.file?
+      entry = entry.name unless entries
+      list << entry if is_file
     end
     list
   end
