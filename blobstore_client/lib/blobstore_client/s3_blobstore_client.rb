@@ -128,9 +128,19 @@ module Bosh
 
       def object_exists?(object_id)
         object_id = full_oid_path(object_id)
-        return simple.exists?(object_id) if simple
 
-        get_object_from_s3(object_id).exists?
+        if simple
+          begin
+            return simple.exists?(object_id)
+          rescue Exception => e
+            if e.message =~ /Could not get object existence, 403/
+              return false
+            end
+            raise
+          end
+        else
+          get_object_from_s3(object_id).exists?
+        end
       end
 
       protected
