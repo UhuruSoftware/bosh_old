@@ -175,6 +175,10 @@ module Bosh::Director
         use_compiled_package_cache? ? @compiled_package_cache_options["provider"] : nil
       end
 
+      def read_only_complied_package_cache?
+        @compiled_package_cache_options["read_only"] == true
+      end
+
       def cloud_type
         if @cloud_options
           @cloud_options["plugin"]

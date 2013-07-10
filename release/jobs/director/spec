@@ -156,6 +156,9 @@ properties:
     description: Password agent uses to connect to blobstore used by simple blobstore plugin
 
   # Compiled Package Cache
+  compiled_package_cache.read_only:
+    description: Enable/Disable only read operations to the compiled package cache (true|false)
+    default: false
   compiled_package_cache.provider:
     description: Provider of the blobstore used for the compiled package cache
     default: 's3'
@@ -193,6 +196,12 @@ properties:
     description: Rackspace Cloud Files API Key
   compiled_package_cache.options.rackspace_region:
     description: Rackspace Cloud Files Region (optional, dfw or ord)
+  compiled_package_cache.options.endpoint:
+    description: DAV endpoint used for the compiled package cache
+  compiled_package_cache.options.user:
+    description: DAV user used for the compiled package cache
+  compiled_package_cache.options.password:
+    description: DAV password used for the compiled package cache
 
   ntp:
     description: List of ntp server IPs

@@ -244,8 +244,10 @@ module Bosh::Director
             if BlobUtil.exists_in_global_cache?(package, task.cache_key)
               @logger.info("Already exists in global package cache, skipping upload")
             else
-              @logger.info("Uploading to global package cache")
-              BlobUtil.save_to_global_cache(compiled_package, task.cache_key)
+              if !Config.read_only_complied_package_cache?
+                @logger.info("Uploading to global package cache")
+                BlobUtil.save_to_global_cache(compiled_package, task.cache_key)
+              end
             end
           else
             @logger.info("Global blobstore not configured, skipping upload")
