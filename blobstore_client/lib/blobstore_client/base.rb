@@ -7,6 +7,8 @@ module Bosh
   module Blobstore
     class BaseClient < Client
 
+      attr_accessor :client
+
       # @param [Hash] options blobstore specific options
       def initialize(options)
         @options = Bosh::Common.symbolize_keys(options)
