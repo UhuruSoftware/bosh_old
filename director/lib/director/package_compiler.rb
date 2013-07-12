@@ -377,7 +377,9 @@ module Bosh::Director
                 compiled_package = BlobUtil.fetch_from_global_cache(package, stemcell, task.cache_key, dependency_key)
               end
             end
-          rescue Exception
+          rescue Exception => e
+            @logger.warn("Could not check/retrieve compiled package for `#{package.desc}'" +
+                             "and stemcell `#{stemcell.desc}' in global cache. Exception: #{e.inspect}")
             retry if (retry_count -= 1) > 0
           end
         end
