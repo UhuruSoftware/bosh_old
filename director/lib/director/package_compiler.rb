@@ -240,17 +240,15 @@ module Bosh::Director
             p.dependency_key = task.dependency_key
           end
 
-          if Config.use_compiled_package_cache?
+          if Config.use_compiled_package_cache? && !Config.read_only_complied_package_cache?
             if BlobUtil.exists_in_global_cache?(package, task.cache_key)
               @logger.info("Already exists in global package cache, skipping upload")
             else
-              if !Config.read_only_complied_package_cache?
-                @logger.info("Uploading to global package cache")
-                BlobUtil.save_to_global_cache(compiled_package, task.cache_key)
-              end
+              @logger.info("Uploading to global package cache")
+              BlobUtil.save_to_global_cache(compiled_package, task.cache_key)
             end
           else
-            @logger.info("Global blobstore not configured, skipping upload")
+            @logger.info("Global write blobstore for package cache not configured, skipping upload")
           end
 
           @counter_mutex.synchronize { @compilations_performed += 1 }
@@ -370,10 +368,17 @@ module Bosh::Director
                      "for stemcell `#{stemcell.desc}'")
       else
         if Config.use_compiled_package_cache?
-          if BlobUtil.exists_in_global_cache?(package, task.cache_key)
-            @event_log.track("Downloading '#{package.desc}' from global cache") do
-              compiled_package = BlobUtil.fetch_from_global_cache(package, stemcell, task.cache_key, dependency_key)
+          # Do not crash if the complied package cache is not accessible.
+          # As a fallback, let the bosh_director compile the packages
+          retry_count = 3
+          begin
+            if BlobUtil.exists_in_global_cache?(package, task.cache_key)
+              @event_log.track("Downloading '#{package.desc}' from global cache") do
+                compiled_package = BlobUtil.fetch_from_global_cache(package, stemcell, task.cache_key, dependency_key)
+              end
             end
+          rescue Exception
+            retry if (retry_count -= 1) > 0
           end
         end
 
