@@ -16,6 +16,12 @@ module Bosh
         @headers = {'Translate' => 'f'}
         user = @options[:user]
         password = @options[:password]
+
+        @client.connect_timeout = @options[:connect_timeout] if @options[:connect_timeout]
+        @client.send_timeout = @options[:send_timeout] if @options[:send_timeout]
+        @client.receive_timeout = @options[:receive_timeout] if @options[:receive_timeout]
+        @client.keep_alive_timeout = @options[:keep_alive_timeout] if @options[:keep_alive_timeout]
+
         if user && password
           @headers["Authorization"] = "Basic " +
               Base64.encode64("#{user}:#{password}").strip
