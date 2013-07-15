@@ -108,12 +108,15 @@ module DeploymentHelper
 
   def cleanup(what)
     # if BAT_FAST is set, we just return so the stemcell & release is
-    # preserved - this saves a lot of time!
-    return if fast?
+    # preserved - this saves a lot of time! However, it's not safe to
+    # skip delete of a deployment.
+
     case what
       when Stemcell
+        return if fast?
         bosh("delete stemcell #{what.name} #{what.version}")
       when Release
+        return if fast?
         bosh("delete release #{what.name}")
       when Deployment
         bosh("delete deployment #{what.name}")
@@ -214,6 +217,10 @@ module DeploymentHelper
 
   def use_static_ip
     @spec["properties"]["use_static_ip"] = true
+  end
+
+  def no_static_ip
+    @spec["properties"]["use_static_ip"] = false
   end
 
   def static_ip

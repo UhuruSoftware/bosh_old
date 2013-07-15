@@ -85,6 +85,15 @@ module Bosh
         upload_and_track(:post, "/stemcells", filename, options)
       end
 
+      def upload_remote_stemcell(stemcell_location, options = {})
+        options = options.dup               
+        payload = { 'location' => stemcell_location }  
+        options[:payload] = JSON.generate(payload)
+        options[:content_type] = 'application/json'          
+
+        request_and_track(:post, '/stemcells', options)
+      end      
+      
       def get_version
         get_status["version"]
       end
@@ -156,6 +165,24 @@ module Bosh
         upload_and_track(:post, "/releases?rebase=true", filename, options)
       end
 
+      def upload_remote_release(release_location, options = {})
+        options = options.dup
+        payload = { 'location' => release_location }  
+        options[:payload] = JSON.generate(payload)
+        options[:content_type] = 'application/json'          
+
+        request_and_track(:post, '/releases', options)
+      end           
+
+      def rebase_remote_release(release_location, options = {})
+        options = options.dup
+        payload = { 'location' => release_location }  
+        options[:payload] = JSON.generate(payload)
+        options[:content_type] = 'application/json'          
+
+        request_and_track(:post, '/releases?rebase=true', options)
+      end
+      
       def delete_stemcell(name, version, options = {})
         options = options.dup
         force = options.delete(:force)
@@ -493,6 +520,15 @@ module Bosh
         raise AuthError if response_code == 401
         raise MissingTask, "No task##{task_id} found" if response_code == 404
         [body, response_code]
+      end
+
+      def create_backup
+        request_and_track(:post, "/backups", {})
+      end
+
+      def fetch_backup
+        _, path, _ = get("/backups", nil, nil, {}, :file => true)
+        path
       end
 
       [:post, :put, :get, :delete].each do |method_name|

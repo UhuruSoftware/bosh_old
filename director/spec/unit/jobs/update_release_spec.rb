@@ -1,17 +1,23 @@
 # Copyright (c) 2009-2012 VMware, Inc.
 
-require File.expand_path("../../../spec_helper", __FILE__)
+require 'spec_helper'
 
 describe Bosh::Director::Jobs::UpdateRelease do
+  let(:blobstore) { double('Blobstore') }
 
   before(:each) do
-    @blobstore = mock(Bosh::Blobstore::Client)
-    BD::Config.stub!(:blobstore).and_return(@blobstore)
+    # Stubbing the blobstore used in BlobUtil :( needs refactoring
+    BD::App.stub_chain(:instance, :blobstores, :blobstore).and_return(blobstore)
     @release_dir = Dir.mktmpdir("release_dir")
   end
 
   after(:each) do
     FileUtils.remove_entry_secure(@release_dir) if File.exist?(@release_dir)
+  end
+
+  describe 'Resque job class expectations' do
+    let(:job_type) { :update_release }
+    it_behaves_like 'a Resque job'
   end
 
   describe "updating a release" do
@@ -26,6 +32,28 @@ describe Bosh::Director::Jobs::UpdateRelease do
       }
     end
 
+    context 'processing update release' do
+      it 'with a local release' do
+        job = BD::Jobs::UpdateRelease.new(@release_dir)
+        job.should_not_receive(:download_remote_release)
+        job.should_receive(:extract_release)
+        job.should_receive(:verify_manifest)
+        job.should_receive(:process_release)
+        
+        job.perform
+      end
+
+      it 'with a remote release' do
+        job = BD::Jobs::UpdateRelease.new(@release_dir, {'remote' => true, 'location' => 'release_location'})
+        job.should_receive(:download_remote_release)
+        job.should_receive(:extract_release)
+        job.should_receive(:verify_manifest)
+        job.should_receive(:process_release)
+        
+        job.perform
+      end
+    end
+    
     context "commit_hash and uncommitted changes flag" do
       it "sets commit_hash and uncommitted changes flag on release_version" do
         release_dir = ReleaseHelper.create_release_tarball(manifest)
@@ -151,7 +179,7 @@ describe Bosh::Director::Jobs::UpdateRelease do
     end
 
     it "rebases original versions saving the major version" do
-      @blobstore.should_receive(:create).
+      blobstore.should_receive(:create).
         exactly(4).times.and_return("b1", "b2", "b3", "b4")
       @job.should_receive(:with_release_lock).with("appcloud").and_yield
       @job.perform
@@ -193,7 +221,7 @@ describe Bosh::Director::Jobs::UpdateRelease do
     end
 
     it "uses major.1-dev version for initial rebase if no version exists" do
-      @blobstore.should_receive(:create).
+      blobstore.should_receive(:create).
         exactly(6).times.and_return("b1", "b2", "b3", "b4", "b5", "b6")
 
       @rv.destroy
@@ -232,7 +260,7 @@ describe Bosh::Director::Jobs::UpdateRelease do
       dup_release_dir = Dir.mktmpdir
       FileUtils.cp(File.join(@release_dir, "release.tgz"), dup_release_dir)
 
-      @blobstore.should_receive(:create).
+      blobstore.should_receive(:create).
         exactly(4).times.and_return("b1", "b2", "b3", "b4")
       @job.should_receive(:with_release_lock).with("appcloud").and_yield
       @job.perform
@@ -280,7 +308,7 @@ describe Bosh::Director::Jobs::UpdateRelease do
         :release => @release, :name => "baz",
         :version => "333", :fingerprint => "deadbeef")
 
-      @blobstore.should_receive(:create).
+      blobstore.should_receive(:create).
         exactly(3).times.and_return("b1", "b2", "b3")
       @job.should_receive(:with_release_lock).with("appcloud").and_yield
       @job.perform
@@ -315,7 +343,7 @@ describe Bosh::Director::Jobs::UpdateRelease do
         f.write(create_package({"test" => "test contents"}))
       end
 
-      @blobstore.should_receive(:create).with(
+      blobstore.should_receive(:create).with(
         have_a_path_of(package_path)).and_return("blob_id")
 
       @job.create_package(
@@ -442,7 +470,7 @@ describe Bosh::Director::Jobs::UpdateRelease do
     it "should create a proper template and upload job bits to blobstore" do
       File.open(@tarball, "w") { |f| f.write(@job_bits) }
 
-      @blobstore.should_receive(:create).and_return do |f|
+      blobstore.should_receive(:create).and_return do |f|
         f.rewind
         Digest::SHA1.hexdigest(f.read).should ==
           Digest::SHA1.hexdigest(@job_bits)

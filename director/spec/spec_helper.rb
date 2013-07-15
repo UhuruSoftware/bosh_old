@@ -1,17 +1,23 @@
 # Copyright (c) 2009-2012 VMware, Inc.
 $: << File.expand_path('..', __FILE__)
 
-require "digest/sha1"
-require "fileutils"
-require "logger"
-require "tmpdir"
-require "zlib"
+require 'digest/sha1'
+require 'fileutils'
+require 'logger'
+require 'tmpdir'
+require 'zlib'
 require 'tempfile'
 
-require "archive/tar/minitar"
-require "rspec"
-require "machinist/sequel"
-require "sham"
+require 'archive/tar/minitar'
+require 'rspec'
+require 'machinist/sequel'
+require 'sham'
+require 'rspec/fire'
+require 'support/job_example_group'
+
+RSpec.configure do |config|
+  config.include(RSpec::Fire)
+end
 
 module SpecHelper
   class << self
@@ -206,10 +212,6 @@ RSpec::Matchers.define :have_flag_set do |method_name|
   description do
     "have '#{method_name}' flag set"
   end
-end
-
-class Object
-  include Bosh::Director::DeepCopy
 end
 
 def asset(filename)

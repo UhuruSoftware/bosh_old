@@ -8,6 +8,7 @@ module Bosh::OpenStackCloud
     include Helpers
 
     BOSH_APP_DIR = "/var/vcap/bosh"
+    FIRST_DEVICE_NAME_LETTER = "b"
 
     attr_reader :openstack
     attr_reader :registry
@@ -34,6 +35,7 @@ module Bosh::OpenStackCloud
 
       @default_key_name = @openstack_properties["default_key_name"]
       @default_security_groups = @openstack_properties["default_security_groups"]
+      @state_timeout = @openstack_properties["state_timeout"]
       @stemcell_public_visibility = @openstack_properties["stemcell_public_visibility"]
 
       unless @openstack_properties["auth_url"].match(/\/tokens$/)
@@ -198,17 +200,18 @@ module Bosh::OpenStackCloud
 
         flavor = with_openstack { @openstack.flavors.find { |f| f.name == resource_pool["instance_type"] } }
         cloud_error("Flavor `#{resource_pool["instance_type"]}' not found") if flavor.nil?
-        cloud_error("Flavor `#{resource_pool["instance_type"]}' doesn't have ephemeral disk") if flavor.ephemeral.nil?
-        if flavor.ram 
-          # Ephemeral disk size should be at least the double of the vm total memory size, as agent will need:
-          # - vm total memory size for swapon, 
-          # - the rest for /vcar/vcap/data 
-          min_ephemeral_size = (flavor.ram / 1024) * 2
-          if flavor.ephemeral < min_ephemeral_size
-            cloud_error("Flavor `#{resource_pool["instance_type"]}' should have at least #{min_ephemeral_size}Gb " + 
-                        "of ephemeral disk")
+        if flavor_has_ephemeral_disk?(flavor)
+          if flavor.ram
+            # Ephemeral disk size should be at least the double of the vm total memory size, as agent will need:
+            # - vm total memory size for swapon,
+            # - the rest for /vcar/vcap/data
+            min_ephemeral_size = (flavor.ram / 1024) * 2
+            if flavor.ephemeral < min_ephemeral_size
+              cloud_error("Flavor `#{resource_pool["instance_type"]}' should have at least #{min_ephemeral_size}Gb " +
+                          "of ephemeral disk")
+            end
           end
-        end        
+        end
         @logger.debug("Using flavor: `#{resource_pool["instance_type"]}'")
 
         keyname = resource_pool["key_name"] || @default_key_name
@@ -248,7 +251,8 @@ module Bosh::OpenStackCloud
         network_configurator.configure(@openstack, server)
 
         @logger.info("Updating settings for server `#{server.id}'...")
-        settings = initial_agent_settings(server_name, agent_id, network_spec, environment)
+        settings = initial_agent_settings(server_name, agent_id, network_spec, environment,
+                                          flavor_has_ephemeral_disk?(flavor))
         @registry.update_settings(server.name, settings)
 
         server.id.to_s
@@ -621,8 +625,9 @@ module Bosh::OpenStackCloud
     #   assume its identity
     # @param [Hash] network_spec Agent network spec
     # @param [Hash] environment Environment settings
+    # @param [Boolean] has_ephemeral Has Ephemeral disk?
     # @return [Hash] Agent settings
-    def initial_agent_settings(server_name, agent_id, network_spec, environment)
+    def initial_agent_settings(server_name, agent_id, network_spec, environment, has_ephemeral)
       settings = {
         "vm" => {
           "name" => server_name
@@ -631,11 +636,11 @@ module Bosh::OpenStackCloud
         "networks" => network_spec,
         "disks" => {
           "system" => "/dev/sda",
-          "ephemeral" => "/dev/sdb",
           "persistent" => {}
         }
       }
 
+      settings["disks"]["ephemeral"] = has_ephemeral ? "/dev/sdb" : nil
       settings["env"] = environment if environment
       settings.merge(@agent_properties)
     end
@@ -682,36 +687,58 @@ module Bosh::OpenStackCloud
     # @param [Fog::Compute::OpenStack::Volume] volume OpenStack volume
     # @return [String] Device name
     def attach_volume(server, volume)
-      @logger.info("Attaching volume `#{volume.id}' to `#{server.id}'...")
+      @logger.info("Attaching volume `#{volume.id}' to server `#{server.id}'...")
       volume_attachments = with_openstack { server.volume_attachments }
       device = volume_attachments.find { |a| a["volumeId"] == volume.id }
 
-      if device.nil?
-        device_names = Set.new(volume_attachments.collect { |v| v["device"] })
-        new_attachment = nil
-        ("c".."z").each do |char|
-          # As some kernels remap device names (from sd* to vd* or xvd*), Bosh Agent will lookup for the 
-          # proper device name if we set it initially to sd*.
-          dev_name = "/dev/sd#{char}"
-          if device_names.include?(dev_name)
-            @logger.warn("`#{dev_name}' on `#{server.id}' is taken")
-            next
-          end
-          @logger.info("Attaching volume `#{volume.id}' to `#{server.id}', " \
-                       "device name is `#{dev_name}'")
-          with_openstack { volume.attach(server.id, dev_name) }
-          wait_resource(volume, :"in-use")
-          new_attachment = dev_name
-          break
-        end
-        cloud_error("Server has too many disks attached") if new_attachment.nil?
+      if device.nil?                
+        device_name = select_device_name(volume_attachments, first_device_name_letter(server))
+        cloud_error("Server has too many disks attached") if device_name.nil?
+
+        @logger.info("Attaching volume `#{volume.id}' to server `#{server.id}', device name is `#{device_name}'")
+        with_openstack { volume.attach(server.id, device_name) }
+        wait_resource(volume, :"in-use")        
       else
-        new_attachment = device["device"]
-        @logger.info("Disk `#{volume.id}' is already attached to server `#{server.id}' " \
-                     "in `#{new_attachment}'. Skipping.")
+        device_name = device["device"]
+        @logger.info("Volume `#{volume.id}' is already attached to server `#{server.id}' in `#{device_name}'. Skipping.")
       end
 
-      new_attachment
+      device_name
+    end
+
+    ##
+    # Select the first available device name
+    #
+    # @param [Array] volume_attachments Volume attachments
+    # @param [String] first_device_name_letter First available letter for device names
+    # @return [String] First available device name or nil is none is available
+    def select_device_name(volume_attachments, first_device_name_letter)
+      (first_device_name_letter.."z").each do |char|
+        # Some kernels remap device names (from sd* to vd* or xvd*). 
+        device_names = ["/dev/sd#{char}", "/dev/vd#{char}", "/dev/xvd#{char}"]
+        # Bosh Agent will lookup for the proper device name if we set it initially to sd*.
+        return "/dev/sd#{char}" if volume_attachments.select { |v| device_names.include?( v["device"]) }.empty?
+        @logger.warn("`/dev/sd#{char}' is already taken")
+      end
+
+      nil
+    end
+
+    ##
+    # Returns the first letter to be used on device names
+    #
+    # @param [Fog::Compute::OpenStack::Server] server OpenStack server
+    # @return [String] First available letter
+    def first_device_name_letter(server)
+      letter = "#{FIRST_DEVICE_NAME_LETTER}"
+      return letter if server.flavor.nil?
+      return letter unless server.flavor.has_key?('id')
+      flavor = with_openstack { @openstack.flavors.find { |f| f.id == server.flavor['id'] } }
+      return letter if flavor.nil?
+
+      letter.succ! if flavor_has_ephemeral_disk?(flavor)
+      letter.succ! if flavor_has_swap_disk?(flavor)
+      letter
     end
 
     ##
@@ -765,6 +792,24 @@ module Bosh::OpenStackCloud
               "IP address change requires VM recreation: %s to %s" %
               [actual_ip_addresses.join(", "), specified_ip_address]
       end
+    end
+
+    ##
+    # Checks if the OpenStack flavor has ephemeral disk
+    #
+    # @param [Fog::Compute::OpenStack::Flavor] OpenStack flavor
+    # @return [Boolean] true if flavor has ephemeral disk, false otherwise
+    def flavor_has_ephemeral_disk?(flavor)
+      flavor.ephemeral.nil? || flavor.ephemeral.to_i <= 0 ? false : true
+    end
+
+    ##
+    # Checks if the OpenStack flavor has swap disk
+    #
+    # @param [Fog::Compute::OpenStack::Flavor] OpenStack flavor
+    # @return [Boolean] true if flavor has swap disk, false otherwise
+    def flavor_has_swap_disk?(flavor)
+      flavor.swap.nil? || flavor.swap.to_i <= 0 ? false : true
     end
 
     ##

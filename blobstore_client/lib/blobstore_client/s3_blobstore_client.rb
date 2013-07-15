@@ -35,7 +35,8 @@ module Bosh
           :access_key_id     => @options[:access_key_id],
           :secret_access_key => @options[:secret_access_key],
           :use_ssl           => true,
-          :port              => 443
+          :port              => 443,
+          :s3_endpoint       => URI.parse(@options[:endpoint] || S3BlobstoreClient::ENDPOINT).host,
         }
 
         # using S3 without credentials is a special case:
@@ -186,6 +187,9 @@ module Bosh
          @options[:folder] ?  @options[:folder] + "/" + object_id : object_id
       end
 
+      def list_objects
+        @s3.buckets[bucket_name].objects.map { |obj| obj.key }
+      end
     end
   end
 end

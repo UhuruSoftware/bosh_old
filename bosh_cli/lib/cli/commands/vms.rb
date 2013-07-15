@@ -2,11 +2,10 @@
 
 module Bosh::Cli::Command
   class Vms < Base
-    include Bosh::Cli::DeploymentHelper
-
     usage "vms"
     desc  "List all VMs in a deployment"
     option "--details", "Return detailed VM information"
+    option "--dns", "Return VM DNS A records"
     option "--vitals", "Return VM vitals information"
     def list(deployment_name = nil)
       auth_required
@@ -22,7 +21,7 @@ module Bosh::Cli::Command
     end
 
     def show_deployment(name, options={})
-      say("Deployment `#{name.green}'")
+      say("Deployment `#{name.make_green}'")
       vms = director.fetch_vm_state(name)
       err("No VMs") if vms.empty?
 
@@ -38,6 +37,9 @@ module Bosh::Cli::Command
         if options[:details]
           headings += ["CID", "Agent ID", "Resurrection"]
         end
+        if options[:dns]
+          headings += ["DNS A records"]
+        end
         if options[:vitals]
           headings += [{:value => "Load\n(avg01, avg05, avg15)", :alignment => :center}]
           headings += ["CPU\nUser", "CPU\nSys", "CPU\nWait"]
@@ -49,12 +51,17 @@ module Bosh::Cli::Command
         sorted.each do |vm|
           job = "#{vm["job_name"] || "unknown"}/#{vm["index"] || "unknown"}"
           ips = Array(vm["ips"]).join(", ")
+          dns_records = Array(vm["dns"]).join("\n")
           vitals = vm["vitals"]
 
           row = [job, vm["job_state"], vm["resource_pool"], ips]
 
           if options[:details]
             row += [vm["vm_cid"], vm["agent_id"], vm["resurrection_paused"] ? 'paused' : 'active']
+          end
+
+          if options[:dns]            
+            row += [dns_records.empty? ? "n/a" : dns_records]
           end
 
           if options[:vitals]
@@ -71,7 +78,11 @@ module Bosh::Cli::Command
               row << "#{mem["percent"]}% (#{pretty_size(mem["kb"].to_i * 1024)})"
               row << "#{swap["percent"]}% (#{pretty_size(swap["kb"].to_i * 1024)})"
               row << "#{disk["system"]["percent"]}%"
-              row << "#{disk["ephemeral"]["percent"]}%"
+              if disk["ephemeral"].nil?
+                row << "n/a"
+              else
+                row << "#{disk["ephemeral"]["percent"]}%"
+              end
               if disk["persistent"].nil?
                 row << "n/a"
               else

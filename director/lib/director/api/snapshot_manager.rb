@@ -1,30 +1,20 @@
 module Bosh::Director
   module Api
     class SnapshotManager
-      include TaskHelper
-
       def create_deployment_snapshot_task(user, deployment, options = {})
-        task = create_task(user, :snapshot_deployment, "snapshot deployment")
-        Resque.enqueue(Jobs::SnapshotDeployment, task.id, deployment.name, options)
-        task
+        JobQueue.new.enqueue(user, Jobs::SnapshotDeployment, 'snapshot deployment', [deployment.name, options])
       end
 
       def create_snapshot_task(user, instance, options)
-        task = create_task(user, :create_snapshot, "create snapshot")
-        Resque.enqueue(Jobs::CreateSnapshot, task.id, instance.id, options)
-        task
+        JobQueue.new.enqueue(user, Jobs::CreateSnapshot, 'create snapshot', [instance.id, options])
       end
 
       def delete_deployment_snapshots_task(user, deployment)
-        task = create_task(user, :delete_deployment_napshots, "delete deployment snapshots")
-        Resque.enqueue(Jobs::DeleteDeploymentSnapshots, task.id, deployment.name)
-        task
+        JobQueue.new.enqueue(user, Jobs::DeleteDeploymentSnapshots, 'delete deployment snapshots', [deployment.name])
       end
 
       def delete_snapshots_task(user, snapshot_cids)
-        task = create_task(user, :delete_snapshot, "delete snapshot")
-        Resque.enqueue(Jobs::DeleteSnapshots, task.id, snapshot_cids)
-        task
+        JobQueue.new.enqueue(user, Jobs::DeleteSnapshots, 'delete snapshot', [snapshot_cids])
       end
 
       def find_by_cid(deployment, snapshot_cid)
@@ -69,6 +59,11 @@ module Bosh::Director
       end
 
       def self.take_snapshot(instance, options={})
+        unless Config.enable_snapshots
+          Config.logger.info('Snapshots are disabled; skipping')
+          return []
+        end
+
         clean = options.fetch(:clean, false)
         snapshot_cids = []
         metadata = {
@@ -89,6 +84,10 @@ module Bosh::Director
         end
 
         snapshot_cids
+
+      rescue Bosh::Clouds::NotImplemented
+        Config.logger.info('CPI does not support disk snapshots; skipping')
+        []
       end
     end
   end

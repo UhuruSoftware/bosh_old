@@ -16,6 +16,11 @@ describe Bosh::Director::Jobs::SnapshotDeployment do
     deployment_manager.stub(find_by_name: deployment)
   end
 
+  describe 'Resque job class expectations' do
+    let(:job_type) { :snapshot_deployment }
+    it_behaves_like 'a Resque job'
+  end
+
   context 'when snapshotting succeeds' do
     it 'should snapshot all instances in the deployment' do
       BD::Api::SnapshotManager.should_receive(:take_snapshot).with(instance1, {})
@@ -28,8 +33,10 @@ describe Bosh::Director::Jobs::SnapshotDeployment do
   end
 
   context 'when snapshotting fails' do
+    let(:nats) { double('NATS', publish: nil) }
+
     before do
-      subject.stub(:send_alert)
+      Bosh::Director::Config.stub(:nats).and_return(nats)
     end
 
     it 'should be shown in the status message' do
@@ -41,11 +48,33 @@ describe Bosh::Director::Jobs::SnapshotDeployment do
     end
 
     it 'should send an alert on the message bus' do
-      subject.should_receive(:send_alert).with(instance1)
+      exception = Bosh::Clouds::CloudError.new('a helpful message')
 
-      BD::Api::SnapshotManager.should_receive(:take_snapshot).with(instance1, {}).and_raise(Bosh::Clouds::CloudError)
+      nats.should_receive(:publish).with do |subject, message|
+        expect(subject).to eq 'hm.director.alert'
+        payload = JSON.parse(message)
+        expect(payload['summary']).to include 'a helpful message'
+        expect(payload['summary']).to include 'CloudError'
+      end
+
+      BD::Api::SnapshotManager.should_receive(:take_snapshot).with(instance1, {}).and_raise(exception)
       BD::Api::SnapshotManager.should_receive(:take_snapshot).with(instance2, {})
       BD::Api::SnapshotManager.should_receive(:take_snapshot).with(instance3, {})
+
+      subject.perform
+    end
+
+    it 'logs the cause of failure' do
+      exception = Bosh::Clouds::CloudError.new('a helpful message')
+      BD::Api::SnapshotManager.should_receive(:take_snapshot).with(instance1, {}).and_raise(exception)
+      BD::Api::SnapshotManager.should_receive(:take_snapshot).with(instance2, {})
+      BD::Api::SnapshotManager.should_receive(:take_snapshot).with(instance3, {})
+
+      Bosh::Director::Config.logger.should_receive(:error).with do |message|
+        expect(message).to include("#{instance1.job}/#{instance1.index}")
+        expect(message).to include(instance1.vm.cid)
+        expect(message).to include('a helpful message')
+      end
 
       subject.perform
     end
@@ -64,14 +93,14 @@ describe Bosh::Director::Jobs::SnapshotDeployment do
                   "id" => 'director',
                   'severity' => 3,
                   'title' => "director - snapshot failure",
-                  'summary' => "failed to snapshot #{job}/#{index}",
+                  'summary' => "failed to snapshot #{job}/#{index}: hello",
                   'created_at' => anything,
               }
           ))
       )
 
       Bosh::Director::Config.stub(:nats => fake_nats)
-      subject.send_alert(fake_instance)
+      subject.send_alert(fake_instance, 'hello')
     end
   end
 end

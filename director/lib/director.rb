@@ -5,115 +5,127 @@ module Bosh
   end
 end
 
-require "digest/sha1"
-require "erb"
-require "fileutils"
-require "forwardable"
-require "logger"
-require "monitor"
-require "optparse"
-require "ostruct"
-require "pp"
-require "thread"
-require "tmpdir"
-require "yaml"
-require "time"
-require "zlib"
+require 'digest/sha1'
+require 'erb'
+require 'fileutils'
+require 'forwardable'
+require 'logger'
+require 'monitor'
+require 'optparse'
+require 'ostruct'
+require 'pathname'
+require 'pp'
+require 'thread'
+require 'tmpdir'
+require 'yaml'
+require 'time'
+require 'zlib'
 
-require "common/exec"
-require "common/properties"
+require 'common/runs_commands'
+require 'common/exec'
+require 'common/properties'
 
-require "bcrypt"
-require "blobstore_client"
-require "eventmachine"
-require "netaddr"
-require "resque"
-require "sequel"
-require "sinatra/base"
-require "securerandom"
-require "yajl"
-require "nats/client"
-require "securerandom"
+require 'bcrypt'
+require 'blobstore_client'
+require 'eventmachine'
+require 'netaddr'
+require 'resque'
+require 'sequel'
+require 'sinatra/base'
+require 'securerandom'
+require 'yajl'
+require 'nats/client'
+require 'securerandom'
 
-require "common/thread_formatter"
-require "encryption/encryption_handler"
-require "director/api"
-require "director/deep_copy"
-require "director/dns_helper"
-require "director/errors"
-require "director/ext"
-require "director/ip_util"
-require "director/lock_helper"
-require "director/metadata_helper"
-require "director/validation_helper"
+require 'common/thread_formatter'
+require 'encryption/encryption_handler'
+require 'director/api'
+require 'director/dns_helper'
+require 'director/errors'
+require 'director/ext'
+require 'director/ip_util'
+require 'director/lock_helper'
+require 'director/metadata_helper'
+require 'director/validation_helper'
+require 'director/download_helper'
 
-require "director/version"
-require "director/config"
-require "director/event_log"
-require "director/task_result_file"
-require "director/version_calc"
-require "director/blob_util"
+require 'director/version'
+require 'director/next_rebase_version'
+require 'director/config'
+require 'director/event_log'
+require 'director/task_result_file'
+require 'director/blob_util'
 
-require "director/client"
-require "director/agent_client"
-require "cloud"
-require "director/compile_task"
-require "director/configuration_hasher"
-require "director/cycle_helper"
-require "director/encryption_helper"
-require "director/vm_creator"
-require "director/vm_data"
-require "director/vm_reuser"
-require "director/deployment_plan"
-require "director/deployment_plan_compiler"
-require "director/duration"
-require "director/hash_string_vals"
-require "director/instance_deleter"
-require "director/instance_updater"
-require "director/job_runner"
-require "director/job_updater"
-require "director/lock"
-require "director/nats_rpc"
-require "director/network_reservation"
-require "director/package_compiler"
-require "director/problem_scanner"
-require "director/problem_resolver"
-require "director/resource_pool_updater"
-require "director/sequel"
-require "common/thread_pool"
+require 'director/client'
+require 'director/agent_client'
+require 'cloud'
+require 'director/compile_task'
+require 'director/configuration_hasher'
+require 'director/cycle_helper'
+require 'director/encryption_helper'
+require 'director/vm_creator'
+require 'director/vm_data'
+require 'director/vm_reuser'
+require 'director/deployment_plan'
+require 'director/deployment_plan_compiler'
+require 'director/duration'
+require 'director/hash_string_vals'
+require 'director/instance_deleter'
+require 'director/instance_updater'
+require 'director/job_runner'
+require 'director/job_updater'
+require 'director/job_queue'
+require 'director/tar_gzipper'
+require 'director/lock'
+require 'director/nats_rpc'
+require 'director/network_reservation'
+require 'director/package_compiler'
+require 'director/problem_scanner'
+require 'director/problem_resolver'
+require 'director/resource_pool_updater'
+require 'director/sequel'
+require 'common/thread_pool'
 
-require "director/cloudcheck_helper"
-require "director/problem_handlers/base"
-require "director/problem_handlers/invalid_problem"
-require "director/problem_handlers/inactive_disk"
-require "director/problem_handlers/out_of_sync_vm"
-require "director/problem_handlers/unresponsive_agent"
-require "director/problem_handlers/unbound_instance_vm"
-require "director/problem_handlers/mount_info_mismatch"
-require "director/problem_handlers/missing_vm"
+require 'director/cloudcheck_helper'
+require 'director/problem_handlers/base'
+require 'director/problem_handlers/invalid_problem'
+require 'director/problem_handlers/inactive_disk'
+require 'director/problem_handlers/out_of_sync_vm'
+require 'director/problem_handlers/unresponsive_agent'
+require 'director/problem_handlers/unbound_instance_vm'
+require 'director/problem_handlers/mount_info_mismatch'
+require 'director/problem_handlers/missing_vm'
 
-require "director/jobs/base_job"
-require "director/jobs/create_snapshot"
-require "director/jobs/snapshot_deployment"
-require "director/jobs/delete_deployment"
-require "director/jobs/delete_deployment_snapshots"
-require "director/jobs/delete_release"
-require "director/jobs/delete_snapshots"
-require "director/jobs/delete_stemcell"
-require "director/jobs/update_deployment"
-require "director/jobs/update_release"
-require "director/jobs/update_stemcell"
-require "director/jobs/fetch_logs"
-require "director/jobs/vm_state"
-require "director/jobs/cloud_check/scan"
-require "director/jobs/cloud_check/scan_and_fix"
-require "director/jobs/cloud_check/apply_resolutions"
-require "director/jobs/ssh"
+require 'director/jobs/base_job'
+require 'director/jobs/backup'
+require 'director/jobs/scheduled_backup'
+require 'director/jobs/create_snapshot'
+require 'director/jobs/snapshot_deployment'
+require 'director/jobs/snapshot_deployments'
+require 'director/jobs/snapshot_self'
+require 'director/jobs/delete_deployment'
+require 'director/jobs/delete_deployment_snapshots'
+require 'director/jobs/delete_release'
+require 'director/jobs/delete_snapshots'
+require 'director/jobs/delete_stemcell'
+require 'director/jobs/update_deployment'
+require 'director/jobs/update_release'
+require 'director/jobs/update_stemcell'
+require 'director/jobs/fetch_logs'
+require 'director/jobs/vm_state'
+require 'director/jobs/cloud_check/scan'
+require 'director/jobs/cloud_check/scan_and_fix'
+require 'director/jobs/cloud_check/apply_resolutions'
+require 'director/jobs/ssh'
 
-require "director/models/helpers/model_helper"
+require 'director/models/helpers/model_helper'
+
+require 'director/db_backup'
+require 'director/blobstores'
+require 'director/app'
 
 module Bosh::Director
-  autoload :Models, "director/models"
+  autoload :Models, 'director/models'
 
   class ThreadPool < Bosh::ThreadPool
     def initialize(options)
@@ -165,6 +177,7 @@ module Bosh::Director
     def initialize
       super
       @deployment_manager = Api::DeploymentManager.new
+      @backup_manager = Api::BackupManager.new
       @instance_manager = Api::InstanceManager.new
       @problem_manager = Api::ProblemManager.new
       @property_manager = Api::PropertyManager.new
@@ -262,9 +275,20 @@ module Bosh::Director
 
     post "/releases", :consumes => :tgz do
       options = {}
+      options["remote"] = false
       options["rebase"] = true if params["rebase"] == "true"
 
       task = @release_manager.create_release(@user, request.body, options)
+      redirect "/tasks/#{task.id}"
+    end
+
+    post "/releases", :consumes => :json do
+      options = {}
+      options["remote"] = true
+      options["rebase"] = true if params["rebase"] == "true"
+      payload = json_decode(request.body)
+
+      task = @release_manager.create_release(@user, payload["location"], options)
       redirect "/tasks/#{task.id}"
     end
 
@@ -274,7 +298,8 @@ module Bosh::Director
           Hash["version", rv.version.to_s,
                "commit_hash", rv.commit_hash,
                "uncommitted_changes", rv.uncommitted_changes,
-               "currently_deployed", !rv.deployments.empty?]
+               "currently_deployed", !rv.deployments.empty?,
+               "job_names", rv.templates.map(&:name)]
         end
 
         Hash["name", release.name,
@@ -485,8 +510,14 @@ module Bosh::Director
     # TODO: stop, start, restart jobs/instances
 
     post "/stemcells", :consumes => :tgz do
-      task = @stemcell_manager.create_stemcell(@user, request.body)
+      task = @stemcell_manager.create_stemcell(@user, request.body, :remote => false)
       redirect "/tasks/#{task.id}"
+    end
+
+    post "/stemcells", :consumes => :json do
+      payload = json_decode(request.body)
+      task = @stemcell_manager.create_stemcell(@user, payload["location"], :remote => true)
+      redirect "/tasks/#{task.id}"      
     end
 
     get "/stemcells" do
@@ -734,6 +765,14 @@ module Bosh::Director
       start_task { @problem_manager.scan_and_fix(@user, params[:deployment], payload) }
     end
 
+    post "/backups" do
+      start_task { @backup_manager.create_backup(@user) }
+    end
+
+    get '/backups' do
+      send_file @backup_manager.destination_path
+    end
+
     get "/info" do
       status = {
         "name"     => Config.name,
@@ -749,6 +788,9 @@ module Bosh::Director
           "compiled_package_cache" => {
             "status" => Config.use_compiled_package_cache?,
             "extras" => { "provider" => Config.compiled_package_cache_provider }
+          },
+          "snapshots" => {
+            "status" => Config.enable_snapshots
           }
         }
       }

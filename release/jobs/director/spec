@@ -20,7 +20,8 @@ packages:
 - nginx
 - genisoimage
 - libpq
-- mysqlclient
+- postgres
+- mysql
 - ruby
 
 properties:
@@ -37,7 +38,10 @@ properties:
     description: Number of nginx workers for director
   director.timeout:
     default: 7200
-    description: Timeout for nginx
+    description: Timeout for connection from bosh CLI to nginx
+  director.proxy_timeout:
+    default: 900
+    description: Timeout for proxy connection from nginx to director
   director.max_upload_size:
     default: 5000m
     description: Max allowed file size for upload
@@ -54,12 +58,17 @@ properties:
   director.max_threads:
     description: Max number of director concurrent threads
     default: 32
+  director.enable_snapshots:
+    description: Enable/Disable snapshots for persistent disks (true|false)
+    default: false
   director.snapshot_schedule:
     description: RufusScheduler cron formatted schedule for snapshots
     default: '0 0 7 * * * UTC'
   director.self_snapshot_schedule:
     description: RufusScheduler cron formatted schedule for self snapshots
     default: '0 0 6 * * * UTC'
+  director.backup_schedule:
+    description: RufusScheduler cron formatted schedule for backups
   director.auto_fix_stateful_nodes:
     description: Enable/Disable auto resolution for stateful nodes for scan_and_fix (true|false)
     default: true
@@ -114,17 +123,23 @@ properties:
     description: Address of the powerdns server
   dns.domain_name:
     description: TLD of the dns zone used by bosh
+    default: bosh
+  dns.db.adapter:
+    description: DNS Database adapter
+    default: postgres
   dns.db.user:
     description: DNS Database user
     default: bosh
   dns.db.password:
     description: DNS Database password
+  dns.db.host:
+    description: DNS Database host
   dns.db.port:
     description: Port that the powerdns database listens on
     default: 5432
   dns.db.database:
     description: Name of the powerdns database
-    default: bosh_dns
+    default: bosh
   dns.db.connection_options:
     description: Additional options for the powerdns database
     default:
@@ -154,6 +169,18 @@ properties:
     description: Username agent uses to connect to blobstore used by simple blobstore plugin
   blobstore.agent.password:
     description: Password agent uses to connect to blobstore used by simple blobstore plugin
+
+  # Blobstore destination for backups
+  #   ex:
+  #     backup_destination
+  #       provider: s3
+  #       options:
+  #         bucket_name: some-bucket-name
+  #         access_key_id: ...
+  #         secret_access_key: ...
+  #
+  director.backup_destination:
+    description: Configuration of the blobstore used by director for backups (dav|simple|s3)
 
   # Compiled Package Cache
   compiled_package_cache.read_only:
@@ -251,6 +278,9 @@ properties:
   openstack.endpoint_type:
     description: OpenStack endpoint type (optional, by default publicURL)
     default: publicURL
+  openstack.state_timeout:
+    description: Timeout (in seconds) for OpenStack resources desired state (optional, by default 300)
+    default: 300
   openstack.stemcell_public_visibility:
     description: Set public visibility for stemcells (optional, false by default)
     default: false

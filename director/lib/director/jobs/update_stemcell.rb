@@ -4,20 +4,33 @@ module Bosh::Director
   module Jobs
     class UpdateStemcell < BaseJob
       include ValidationHelper
+      include DownloadHelper
 
+      UPDATE_STEPS = 5
+      
       @queue = :normal
 
+      def self.job_type
+        :update_stemcell
+      end
+
       # @param [String] stemcell_file Stemcell tarball path
-      def initialize(stemcell_file)
+      def initialize(stemcell_file, options = {})
         @stemcell_file = stemcell_file
         @cloud = Config.cloud
         @stemcell_manager = Api::StemcellManager.new
+        @remote_stemcell = options['remote'] || false
       end
 
       def perform
         logger.info("Processing update stemcell")
-        event_log.begin_stage("Update stemcell", 5)
+        event_log.begin_stage("Update stemcell", update_steps)
 
+        if @remote_stemcell
+          downloaded_stemcell_dir = Dir.mktmpdir("downloaded-stemcell")        
+          download_remote_stemcell(downloaded_stemcell_dir)
+        end
+        
         stemcell_dir = Dir.mktmpdir("stemcell")
 
         track_and_log("Extracting stemcell archive") do
@@ -74,7 +87,22 @@ module Bosh::Director
         "/stemcells/#{stemcell.name}/#{stemcell.version}"
       ensure
         FileUtils.rm_rf(stemcell_dir) if stemcell_dir
+        FileUtils.rm_rf(downloaded_stemcell_dir) if downloaded_stemcell_dir
         FileUtils.rm_rf(@stemcell_file) if @stemcell_file
+      end
+      
+      def download_remote_stemcell(downloaded_stemcell_dir)
+        track_and_log("Downloading remote stemcell") do
+          downloaded_stemcell_file = File.join(downloaded_stemcell_dir, "stemcell-#{SecureRandom.uuid}")
+          download_remote_file('stemcell', @stemcell_file, downloaded_stemcell_file)
+          @stemcell_file = downloaded_stemcell_file          
+        end
+      end
+      
+      private
+      
+      def update_steps
+        @remote_stemcell ? UPDATE_STEPS + 1 : UPDATE_STEPS
       end
     end
   end

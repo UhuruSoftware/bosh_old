@@ -8,6 +8,11 @@ describe Bosh::Director::Jobs::CloudCheck::ApplyResolutions do
     Bosh::Director::ProblemResolver.stub(new: resolver)
   end
 
+  describe 'Resque job class expectations' do
+    let(:job_type) { :cck_apply }
+    it_behaves_like 'a Resque job'
+  end
+
   let(:resolutions) { {1 => 'delete_disk', 2 => 'ignore'} }
   let(:normalized_resolutions) { {'1' => 'delete_disk', '2' => 'ignore'} }
   let(:job) { described_class.new('deployment', resolutions) }

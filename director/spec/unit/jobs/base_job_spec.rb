@@ -1,6 +1,6 @@
 # Copyright (c) 2009-2012 VMware, Inc.
 
-require File.expand_path("../../../spec_helper", __FILE__)
+require 'spec_helper'
 
 describe Bosh::Director::Jobs::BaseJob do
 
@@ -16,6 +16,12 @@ describe Bosh::Director::Jobs::BaseJob do
     @result_file = mock("result-file")
     Bosh::Director::TaskResultFile.stub!(:new).with("#{@task_dir}/result").
       and_return(@result_file)
+  end
+
+  describe 'described_class.job_type' do
+    it 'should complain that the method is not implemented' do
+      expect { described_class.job_type }.to raise_error(NotImplementedError)
+    end
   end
 
   it "should set up the task" do

@@ -9,6 +9,11 @@ describe Bosh::Director::Jobs::CreateSnapshot do
 
   subject { described_class.new(instance.id, options) }
 
+  describe 'Resque job class expectations' do
+    let(:job_type) { :create_snapshot }
+    it_behaves_like 'a Resque job'
+  end
+
   it 'tells the snapshot manager to create a snapshot' do
     BD::Api::SnapshotManager.should_receive(:take_snapshot).with(instance, options).and_return(cids)
 

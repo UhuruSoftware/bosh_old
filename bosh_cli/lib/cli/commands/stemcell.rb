@@ -25,9 +25,9 @@ module Bosh::Cli::Command
       nl
 
       if stemcell.valid?
-        say("`#{tarball_path}' is a valid stemcell".green)
+        say("`#{tarball_path}' is a valid stemcell".make_green)
       else
-        say("Validation errors:".red)
+        say("Validation errors:".make_red)
         stemcell.errors.each do |error|
           say("- %s" % [error])
         end
@@ -37,37 +37,49 @@ module Bosh::Cli::Command
 
     # bosh upload stemcell
     usage "upload stemcell"
-    desc "Upload stemcell"
-    def upload(tarball_path)
+    desc "Upload stemcell (stemcell_location can be a local file or a remote URI)"
+    def upload(stemcell_location)
       auth_required
 
-      stemcell = Bosh::Cli::Stemcell.new(tarball_path, cache)
+      stemcell_type = stemcell_location =~ /^#{URI::regexp}$/ ? "remote" : "local"
+      if stemcell_type == "local"
+        stemcell = Bosh::Cli::Stemcell.new(stemcell_location, cache)
+  
+        nl
+        say("Verifying stemcell...")
+        stemcell.validate
+        nl
+  
+        unless stemcell.valid?
+          err("Stemcell is invalid, please fix, verify and upload again")
+        end
+  
+        say("Checking if stemcell already exists...")
+        name = stemcell.manifest["name"]
+        version = stemcell.manifest["version"]
+  
+        if exists?(name, version)
+          err("Stemcell `#{name}/#{version}' already exists, " +
+                "increment the version if it has changed")
+        else
+          say("No")
+        end
+        
+        stemcell_location = stemcell.stemcell_file
 
-      nl
-      say("Verifying stemcell...")
-      stemcell.validate
-      nl
-
-      unless stemcell.valid?
-        err("Stemcell is invalid, please fix, verify and upload again")
-      end
-
-      say("Checking if stemcell already exists...")
-      name = stemcell.manifest["name"]
-      version = stemcell.manifest["version"]
-
-      if exists?(name, version)
-        err("Stemcell `#{name}/#{version}' already exists, " +
-              "increment the version if it has changed")
+        nl
+        say("Uploading stemcell...")
+        nl
       else
-        say("No")
+        nl
+        say("Using remote stemcell `#{stemcell_location}'")
       end
 
-      nl
-      say("Uploading stemcell...")
-      nl
-
-      status, task_id = director.upload_stemcell(stemcell.stemcell_file)
+      if stemcell_type == "local"
+        status, task_id = director.upload_stemcell(stemcell_location)
+      else
+        status, task_id = director.upload_remote_stemcell(stemcell_location)
+      end
 
       task_report(status, task_id, "Stemcell uploaded and created")
     end
@@ -168,7 +180,7 @@ module Bosh::Cli::Command
         err("The downloaded file sha1 `#{file_sha1}' does not match the " +
             "expected sha1 `#{sha1}'")
       else
-        say("Download complete".green)
+        say("Download complete".make_green)
       end
     end
 
@@ -186,10 +198,10 @@ module Bosh::Cli::Command
         err("Stemcell `#{name}/#{version}' does not exist")
       end
 
-      say("You are going to delete stemcell `#{name}/#{version}'".red)
+      say("You are going to delete stemcell `#{name}/#{version}'".make_red)
 
       unless confirmed?
-        say("Canceled deleting stemcell".green)
+        say("Canceled deleting stemcell".make_green)
         return
       end
 

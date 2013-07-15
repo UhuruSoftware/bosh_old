@@ -1,3 +1,8 @@
+<%
+  def blobstore_options(name, options)
+    YAML.dump(name => options).sub(/\A---\n/, '')
+  end
+%>
 ---
 name: <%= p('director.name') %>
 port: <%= p('director.backend_port') %>
@@ -28,15 +33,23 @@ db:
   port: <%= p('director.db.port') %>
   database: <%= p('director.db.database') %>
   connection_options: <%= JSON.generate(p('director.db.connection_options')) %>
+snapshots:
+  enabled: <%= p('director.enable_snapshots') %>
+
 scheduled_jobs:
-  <% if p('director.snapshot_schedule') %>
-  - command: snapshot_deployments
-    schedule: <%= p('director.snapshot_schedule') %>
+  <% if_p('director.snapshot_schedule') do |snapshot_schedule| %>
+  - command: SnapshotDeployments
+    schedule: <%= snapshot_schedule %>
   <% end %>
-  <% if p('director.self_snapshot_schedule') %>
-  - command: snapshot_self
-    schedule: <%= p('director.self_snapshot_schedule') %>
+  <% if_p('director.self_snapshot_schedule') do |self_snapshot_schedule| %>
+  - command: SnapshotSelf
+    schedule: <%= self_snapshot_schedule %>
   <% end %>
+  <% if_p('director.backup_schedule') do |backup_schedule| %>
+  - command: ScheduledBackup
+    schedule: <%= backup_schedule %>
+  <% end %>
+
 scan_and_fix:
   auto_fix_stateful_nodes: <%= p('director.auto_fix_stateful_nodes') %>
 <% if_p('dns.db.adapter', 'dns.db.user', 'dns.db.password', 'dns.db.host',
@@ -60,7 +73,7 @@ dns:
 blobstore:
   provider: <%= p('blobstore.provider') %>
   options:
-<% if p('blobstore.provider') == "s3" %>
+<% if p('blobstore.provider') == 's3' %>
     bucket_name: <%= p('blobstore.bucket_name') %>
     access_key_id: <%= p('blobstore.access_key_id') %>
     secret_access_key: <%= p('blobstore.secret_access_key') %>
@@ -69,6 +82,7 @@ blobstore:
     user: <%= p('blobstore.director.user') %>
     password: <%= p('blobstore.director.password') %>
 <% end %>
+
 <% if_p('compiled_package_cache.options.bucket_name') do |bucket_name| %>
 compiled_package_cache:
   read_only: <%= p('compiled_package_cache.read_only') %>
@@ -131,6 +145,10 @@ compiled_package_cache:
     password: <%= password %>
 <% end %>
 
+<% if_p('director.backup_destination') do |backup_destination| %>
+<%= blobstore_options('backup_destination', backup_destination) %>
+<% end %>
+
 cloud:
 <% plugin = nil %>
 <% if_p('aws.access_key_id', 'aws.secret_access_key',
@@ -180,6 +198,9 @@ cloud:
       <% end %>
       <% if_p("openstack.endpoint_type") do |endpoint_type| %>
       endpoint_type: <%= endpoint_type %>
+      <% end %>
+      <% if_p("openstack.state_timeout") do |state_timeout| %>
+      state_timeout: <%= state_timeout %>
       <% end %>
       <% if_p("openstack.stemcell_public_visibility") do |stemcell_public_visibility| %>
       stemcell_public_visibility: <%= stemcell_public_visibility %>

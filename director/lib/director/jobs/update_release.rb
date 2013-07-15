@@ -1,16 +1,22 @@
 # Copyright (c) 2009-2012 VMware, Inc.
 
+require 'common/version_number'
+
 module Bosh::Director
   module Jobs
     class UpdateRelease < BaseJob
       include LockHelper
-      include VersionCalc
+      include DownloadHelper
 
       @queue = :normal
 
       # TODO: remove these, only being used in tests, better to refactor tests
       attr_accessor :release_model
       attr_accessor :tmp_release_dir
+
+      def self.job_type
+        :update_release
+      end
 
       # @param [String] tmp_release_dir Directory containing release bundle
       # @param [Hash] options Release update options
@@ -29,6 +35,9 @@ module Bosh::Director
 
         @packages_unchanged = false
         @jobs_unchanged = false
+        
+        @remote_release = options['remote'] || false
+        @remote_release_location = options['location'] if @remote_release 
       end
 
       # Extracts release tarball, verifies release manifest and saves release
@@ -40,6 +49,7 @@ module Bosh::Director
           logger.info("Release rebase will be performed")
         end
 
+        single_step_stage("Downloading remote release") { download_remote_release } if @remote_release
         single_step_stage("Extracting release") { extract_release }
         single_step_stage("Verifying manifest") { verify_manifest }
 
@@ -59,6 +69,11 @@ module Bosh::Director
           FileUtils.rm_rf(@tmp_release_dir)
         end
         # TODO: delete task status file or cleanup later?
+      end
+
+      def download_remote_release         
+        release_file = File.join(@tmp_release_dir, Api::ReleaseManager::RELEASE_TGZ)
+        download_remote_file('release', @remote_release_location, release_file)
       end
 
       # Extracts release tarball
@@ -635,26 +650,7 @@ module Bosh::Director
       # @param [String] version Current version of item
       # @return [String] Next version to be used
       def next_version(collection, version)
-        return version if final_version?(version)
-        major = major_version(version)
-
-        latest = collection.select { |item|
-          major_version(item.version) == major
-        }.sort { |a, b|
-          version_cmp(b.version, a.version)
-        }.first
-
-        if latest
-          version = bump_minor_version(latest.version)
-          # Keeping '-dev' suffix for rebased versions is not a requirement
-          # and mostly done for versioning consistency
-          version += "-dev" unless version =~ /-dev$/
-          version
-        else
-          # The very initial rebase would still discard original versions and
-          # start versioning at '#{major}.1-dev' (for consistency)
-          "#{major}.1-dev"
-        end
+        Bosh::Director::NextRebaseVersion.new(collection).calculate(version)
       end
 
       # Removes release version model, along with all packages and templates.
@@ -677,7 +673,7 @@ module Bosh::Director
         collection.sort_by { |item|
           if item.version == original_version
             1
-          elsif final_version?(item.version)
+          elsif Bosh::Common::VersionNumber.new(item.version).final?
             2
           elsif item.is_a?(Bosh::Director::Models::Package)
             3000 - [item.compiled_packages.size, 900].min
@@ -685,10 +681,6 @@ module Bosh::Director
             3000
           end
         }.first
-      end
-
-      def final_version?(version)
-        version !~ /-dev$/
       end
     end
   end

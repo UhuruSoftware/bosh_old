@@ -3,8 +3,13 @@
 require 'fileutils'
 
 module Bosh::Director
-  class Config
 
+  # We are in the slow painful process of extracting all of this class-level
+  # behavior into instance behavior, much of it on the App class. When this
+  # process is complete, the Config will be responsible only for maintaining
+  # configuration information - not holding the state of the world.
+
+  class Config
     class << self
       include DnsHelper
 
@@ -27,12 +32,15 @@ module Bosh::Director
         :uuid,
         :current_job,
         :encryption,
-        :fix_stateful_nodes
+        :fix_stateful_nodes,
+        :enable_snapshots
       ]
 
       CONFIG_OPTIONS.each do |option|
         attr_accessor option
       end
+
+      attr_reader :db_config
 
       def clear
         CONFIG_OPTIONS.each do |option|
@@ -51,6 +59,7 @@ module Bosh::Director
       end
 
       def configure(config)
+
         @base_dir = config["dir"]
         FileUtils.mkdir_p(@base_dir)
 
@@ -58,13 +67,13 @@ module Bosh::Director
         @task_checkpoint_interval = 30
 
         logging = config.fetch('logging', {})
-        log_device = Logger::LogDevice.new(logging.fetch('file', STDOUT))
-        @logger = Logger.new(log_device)
+        @log_device = Logger::LogDevice.new(logging.fetch('file', STDOUT))
+        @logger = Logger.new(@log_device)
         @logger.level = Logger.const_get(logging.fetch('level', 'debug').upcase)
         @logger.formatter = ThreadFormatter.new
 
         # use a separate logger for redis to make it stfu
-        redis_logger = Logger.new(log_device)
+        redis_logger = Logger.new(@log_device)
         logging = config.fetch('redis', {}).fetch('logging', {})
         redis_logger_level = logging.fetch('level', 'info').upcase
         redis_logger.level = Logger.const_get(redis_logger_level)
@@ -93,14 +102,12 @@ module Bosh::Director
         @nats_uri = config["mbus"]
 
         @cloud_options = config["cloud"]
-        @blobstore_options = config["blobstore"]
-
         @compiled_package_cache_options = config["compiled_package_cache"]
         @name = config["name"] || ""
 
-        @blobstore = nil
         @compiled_package_cache = nil
 
+        @db_config = config['db']
         @db = configure_db(config["db"])
         @dns = config["dns"]
         @dns_domain_name = "bosh"
@@ -115,10 +122,15 @@ module Bosh::Director
         @encryption = config["encryption"]
         @fix_stateful_nodes = config.fetch("scan_and_fix", {})
           .fetch("auto_fix_stateful_nodes", false)
+        @enable_snapshots = config.fetch('snapshots', {}).fetch('enabled', false)
 
         Bosh::Clouds::Config.configure(self)
 
         @lock = Monitor.new
+      end
+
+      def log_dir
+        File.dirname(@log_device.filename) if @log_device.filename
       end
 
       def use_compiled_package_cache?
@@ -147,17 +159,6 @@ module Bosh::Director
         end
 
         db
-      end
-
-      def blobstore
-        @lock.synchronize do
-          if @blobstore.nil?
-            provider = @blobstore_options["provider"]
-            options = @blobstore_options["options"]
-            @blobstore = Bosh::Blobstore::Client.create(provider, options)
-          end
-        end
-        @blobstore
       end
 
       def compiled_package_cache_blobstore
@@ -350,6 +351,23 @@ module Bosh::Director
         SecureRandom.uuid
       end
 
+    end
+
+    class << self
+      def load_file(path)
+        Config.new(Psych.load_file(path))
+      end
+      def load_hash(hash)
+        Config.new(hash)
+      end
+    end
+
+    attr_reader :hash
+
+    private
+
+    def initialize(hash)
+      @hash = hash
     end
 
   end

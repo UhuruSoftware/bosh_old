@@ -21,6 +21,11 @@ describe Bosh::Director::Jobs::DeleteDeploymentSnapshots do
 
   subject { described_class.new(deployment_name) }
 
+  describe 'Resque job class expectations' do
+    let(:job_type) { :delete_deployment_snapshots }
+    it_behaves_like 'a Resque job'
+  end
+
   it 'tells the snapshot manager to delete all snapshots of a deployment' do
     BD::Api::DeploymentManager.should_receive(:new).and_return(deployment_manager)
     deployment_manager.should_receive(:find_by_name).with(deployment_name).and_return(deployment)

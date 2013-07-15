@@ -30,18 +30,13 @@ module Bosh::Agent
       case @config.infrastructure_name
         when "vsphere"
           VSPHERE_DATA_DISK
-        when "aws"
+        when "aws", "openstack"
           settings = @config.settings
           dev_path = settings['disks']['ephemeral']
           unless dev_path
-            raise Bosh::Agent::FatalError, "Unknown data or ephemeral disk"
-          end
-          get_available_path(dev_path)
-        when "openstack"
-          settings = @config.settings
-          dev_path = settings['disks']['ephemeral']
-          unless dev_path
-            raise Bosh::Agent::FatalError, "Unknown data or ephemeral disk"
+            raise Bosh::Agent::FatalError, "Unknown data or ephemeral disk" if @config.infrastructure_name == "aws"
+            @logger.warn("No ephemeral disk set, using root device for BOSH agent data!!!")
+            return nil
           end
           get_available_path(dev_path)
         else
@@ -60,11 +55,8 @@ module Bosh::Agent
         when "vsphere"
           # VSphere passes in scsi disk id
           get_available_scsi_path(disk_id)
-        when "aws"
-          # AWS passes in the device name
-          get_available_path(disk_id)
-        when "openstack"
-          # OpenStack passes in the device name
+        when "aws", "openstack"
+          # AWS & OpenStack pass in the device name
           get_available_path(disk_id)
         else
           raise Bosh::Agent::FatalError, "Lookup disk failed, unsupported infrastructure #{Bosh::Agent::Config.infrastructure_name}"

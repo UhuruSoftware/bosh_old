@@ -47,12 +47,16 @@ require "cli/errors"
 require "cli/yaml_helper"
 require "cli/version_calc"
 require "cli/dependency_helper"
+require "cli/deployment_manifest"
 require "cli/deployment_helper"
 require "cli/validation"
 require "cli/cache"
 require "cli/stemcell"
 require "cli/director"
 require "cli/director_task"
+
+require 'cli/line_wrap'
+require 'cli/backup_destination_path'
 
 require "cli/versions_index"
 require "cli/packaging_helper"
