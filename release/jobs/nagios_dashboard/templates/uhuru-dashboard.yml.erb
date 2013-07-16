@@ -13,14 +13,14 @@ director:
   password: <%= properties.nagios.director_password %>
   create_user: <%= properties.nagios.create_director_user || false %>
 
-default_warn_level: 80
-default_critical_level: 90
+default_warn_level: <%= properties.nagios.default_warn_level || 80 %>
+default_critical_level: <%= properties.nagios.default_critical_level || 90 %>
 data_dir: /var/vcap/store/nagios/data/
 ssh_reset_interval_min: 1440
 
 alerts:
   email_to: "<%= properties.nagios.alerts.email_to || "" %>"
-  notification_interval: 0
+  notification_interval: <%= properties.nagios.alerts.notification_interval || 0 %>
 
 email:
   from: "<%= properties.nagios.email.from || "postmaster@uhurusoftware.mailgun.org" %>"
