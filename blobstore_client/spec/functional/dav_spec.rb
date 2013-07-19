@@ -1,10 +1,10 @@
 require 'spec_helper'
 
-describe Bosh::Blobstore::DavBlobstoreClient, nginx: true do
+describe Bosh::Blobstore::DavBlobstoreClient do #, nginx: true do
 
   attr_reader :port, :root, :read_users_path, :write_users_path
 
-  NGINX_PATH = '/usr/local/sbin/nginx'
+  NGINX_PATH = '/usr/sbin/nginx'
 
   def create_user_file(users)
     temp = Tempfile.new('users')
@@ -77,13 +77,26 @@ describe Bosh::Blobstore::DavBlobstoreClient, nginx: true do
       end
 
       it 'supports resuming' do
-        dwn_file = Tempfile.new
+        dwn_file = Tempfile.new('download_file')
         dwn_file.write 't'
         
         subject.get('test', dwn_file)
         dwn_file.rewind
         expect(dwn_file.read).to eq 'test'
       end
+
+      it 'supports resuming on append files' do
+        dwn_file = Tempfile.new('download_file')
+        dwn_file.write 't'
+        dwn_file.flush
+        
+        dwn_file_append = File.open(dwn_file.path, "a")
+        subject.get('test', dwn_file_append)
+        dwn_file_append.close
+
+        expect(File.read(dwn_file.path)).to eq 'test'
+      end
+
     end
 
     context 'with unauthorized user' do
