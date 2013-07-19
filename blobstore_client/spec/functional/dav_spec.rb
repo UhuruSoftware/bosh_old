@@ -75,6 +75,15 @@ describe Bosh::Blobstore::DavBlobstoreClient, nginx: true do
       it 'allows checking for existance' do
         expect(subject.exists?('test')).to be_true
       end
+
+      it 'supports resuming' do
+        dwn_file = Tempfile.new
+        dwn_file.write 't'
+        
+        subject.get('test', dwn_file)
+        dwn_file.rewind
+        expect(dwn_file.read).to eq 'test'
+      end
     end
 
     context 'with unauthorized user' do
