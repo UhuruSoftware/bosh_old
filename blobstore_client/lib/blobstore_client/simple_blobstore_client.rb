@@ -35,13 +35,7 @@ module Bosh
       end
 
       def get_file(id, file)
-        # Continue to download the data from the current position of the file,
-        # This will enable resumable downloads.
-        start_offset = file.pos
-        headers = @headers.clone
-        headers["Range"] = "bytes=#{start_offset}-"
-
-        response = @client.get(url(id), {}, headers) do |block|
+        response = @client.get(url(id), {}, @headers) do |block|
           file.write(block)
         end
 
