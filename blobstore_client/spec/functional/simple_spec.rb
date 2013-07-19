@@ -71,4 +71,15 @@ describe Bosh::Blobstore::SimpleBlobstoreClient do
     blob_store_client.exists?(blob_id).should be_false
   end
 
+  it 'should supports resuming with file arguments' do
+    blob_id = blob_store_client.create("existing_resource", 'id')
+
+    dwn_file = Tempfile.new 'download_file'
+    dwn_file.write 'existing'
+
+    blob_store_client.get('id', dwn_file)
+    dwn_file.rewind
+    dwn_file.read.should == 'existing_resource'
+  end
+
 end

@@ -45,7 +45,7 @@ module Bosh
           file.write(block)
         end
 
-        if response.status != 200
+        unless [200, 206].include? response.status
           raise BlobstoreError,
                 "Could not fetch object, #{response.status}/#{response.content}"
         end
