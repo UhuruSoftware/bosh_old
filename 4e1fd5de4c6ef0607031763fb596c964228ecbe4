@@ -1,0 +1,8 @@
+Change-Id: I4e1fd5de4c6ef0607031763fb596c964228ecbe4
+Code-Review+2: Vlad Iovanov <vlad.iovanov@uhurusoftware.com>
+Verified+1: Vlad Iovanov <vlad.iovanov@uhurusoftware.com>
+Submitted-by: Vlad Iovanov <vlad.iovanov@uhurusoftware.com>
+Submitted-at: Fri, 19 Jul 2013 11:18:53 +0300
+Reviewed-on: http://gerrit.uhurusoftware.org/1691
+Project: private-bosh
+Branch: refs/heads/master
