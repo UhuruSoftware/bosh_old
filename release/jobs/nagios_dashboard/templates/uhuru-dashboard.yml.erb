@@ -17,6 +17,7 @@ default_warn_level: <%= properties.nagios.default_warn_level || 80 %>
 default_critical_level: <%= properties.nagios.default_critical_level || 90 %>
 data_dir: /var/vcap/store/nagios/data/
 ssh_reset_interval_min: 1440
+listen_address: <%= properties.nagios.listen_address %>
 
 alerts:
   email_to: "<%= properties.nagios.alerts.email_to || "" %>"
