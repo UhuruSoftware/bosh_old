@@ -46,6 +46,7 @@ vm_hostname=ubuntu
 vm_arch=amd64
 vm_guestos=ubuntu-64
 
+# http://kb.vmware.com/kb/1189
 cat > $vsphere/$vm_hostname.vmx <<EOS
 config.version = "8"
 virtualHW.version = 7
@@ -90,6 +91,14 @@ scsi0:0.redo = ""
 
 tools.syncTime = "FALSE"
 tools.remindInstall = "TRUE"
+
+time.synchronize.continue = "FALSE"
+time.synchronize.restore = "FALSE"
+time.synchronize.resume.disk = "FALSE"
+time.synchronize.shrink = "FALSE"
+time.synchronize.tools.startup = "FALSE"
+time.synchronize.tools.enable = "FALSE"
+time.synchronize.resume.host = "FALSE"
 
 evcCompatibilityMode = "FALSE"
 EOS
