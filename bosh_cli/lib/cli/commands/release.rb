@@ -82,12 +82,14 @@ module Bosh::Cli::Command
            "Rebases this release onto the latest version",
            "known by director (discards local job/package",
            "versions in favor of versions assigned by director)"
+    option "--skip-if-exists", "skips upload if release already exists"
     def upload(release_file = nil)
       auth_required
 
       upload_options = {
-          :rebase => options[:rebase],
-          :repack => true
+        :rebase => options[:rebase],
+        :repack => true,
+        :skip_if_exists => options[:skip_if_exists],
       }
 
       if release_file.nil?
@@ -226,19 +228,25 @@ module Bosh::Cli::Command
         err("Release is invalid, please fix, verify and upload again")
       end
 
-      begin
-        remote_release = get_remote_release(tarball.release_name) rescue nil
-
-        if remote_release && !rebase &&
-            remote_release["versions"].include?(tarball.version)
-          err("This release version has already been uploaded")
+      remote_release = get_remote_release(tarball.release_name) rescue nil
+      if remote_release && !rebase
+        if remote_release["versions"].include?(tarball.version)
+          if upload_options[:skip_if_exists]
+            say("Release `#{tarball.release_name}/#{tarball.version}' already exists. Skipping upload.")
+            return
+          else
+            err("This release version has already been uploaded")
+          end
         end
+      end
 
+      begin
         if repack
           package_matches = match_remote_packages(tarball.manifest)
 
           say("Checking if can repack release for faster upload...")
           repacked_path = tarball.repack(package_matches)
+
           if repacked_path.nil?
             say("Uploading the whole release".make_green)
           else
@@ -265,13 +273,13 @@ module Bosh::Cli::Command
     def upload_remote_release(release_location, upload_options = {})
       nl
       if upload_options[:rebase]
-        say("Uploading remote release `#{release_location}' (#{"will be rebased".make_yellow})")
+        say("Using remote release `#{release_location}' (#{"will be rebased".make_yellow})")
         status, task_id = director.rebase_remote_release(release_location)
         task_report(status, task_id, "Release rebased")
       else
-        say("Uploading remote release `#{release_location}'")
+        say("Using remote release `#{release_location}'")
         status, task_id = director.upload_remote_release(release_location)
-        task_report(status, task_id, "Release uploaded")                
+        task_report(status, task_id, "Release uploaded")
       end
     end
     
@@ -302,10 +310,6 @@ module Bosh::Cli::Command
         header("Building DEV release".make_green)
       end
 
-      if version_greater(release.min_cli_version, Bosh::Cli::VERSION)
-        err("You should use CLI >= #{release.min_cli_version} with this release, you have #{Bosh::Cli::VERSION}")
-      end
-
       header("Building packages")
       packages = build_packages(dry_run, final)
 
@@ -329,7 +333,6 @@ module Bosh::Cli::Command
                 release_builder.tarball_path.make_green)
       end
 
-      release.min_cli_version = Bosh::Cli::VERSION
       release.save_config
 
       release_builder.manifest_path

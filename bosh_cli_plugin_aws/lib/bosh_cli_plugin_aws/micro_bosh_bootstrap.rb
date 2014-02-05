@@ -51,13 +51,13 @@ module Bosh
       end
 
       def cleanup_previous_deployments
-        rm_files = %w[bosh-deployments.yml micro bosh_registry.log]
+        rm_files = %w[bosh-deployments.yml micro bosh-registry.log]
         rm_files.each { |file| FileUtils.rm_rf File.join("deployments", file) }
       end
 
       def micro_ami
         ENV["BOSH_OVERRIDE_MICRO_STEMCELL_AMI"] ||
-            Net::HTTP.get("#{AWS_JENKINS_BUCKET}.s3.amazonaws.com", "/last_successful_micro-bosh-stemcell-aws_ami_us-east-1").strip
+            Net::HTTP.get("#{AWS_JENKINS_BUCKET}.s3.amazonaws.com", "/last_successful-bosh-stemcell-aws_ami_us-east-1").strip
       end
     end
   end

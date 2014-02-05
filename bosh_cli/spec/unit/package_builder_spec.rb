@@ -1,10 +1,7 @@
-# Copyright (c) 2009-2012 VMware, Inc.
-
 require "spec_helper"
 
 describe Bosh::Cli::PackageBuilder, "dev build" do
-
-  before(:each) do
+  before do
     @release_dir = Dir.mktmpdir
     FileUtils.mkdir(File.join(@release_dir, "src"))
     FileUtils.mkdir(File.join(@release_dir, "blobs"))
@@ -34,7 +31,7 @@ describe Bosh::Cli::PackageBuilder, "dev build" do
   end
 
   def make_builder(name, files, dependencies = [], sources_dir = nil)
-    blobstore = mock("blobstore")
+    blobstore = double("blobstore")
     spec = {
       "name" => name,
       "files" => files,
@@ -210,7 +207,7 @@ describe Bosh::Cli::PackageBuilder, "dev build" do
   it "generates tarball" do
     add_files("src", %w(foo/foo.rb foo/lib/1.rb foo/lib/2.rb foo/README baz))
     builder = make_builder("bar", %w(foo/**/* baz))
-    builder.generate_tarball.should be_true
+    builder.generate_tarball.should be(true)
   end
 
   it "can point to either dev or a final version of a package" do
@@ -251,28 +248,28 @@ describe Bosh::Cli::PackageBuilder, "dev build" do
     builder = make_builder("bar", globs)
 
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.1-dev.tgz").
-        should be_false
+        should be(false)
     builder.build
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.1-dev.tgz").
-        should be_true
+        should be(true)
 
     builder = make_builder("bar", globs)
     builder.build
     v1_fingerprint = builder.fingerprint
 
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.1-dev.tgz").
-        should be_true
+        should be(true)
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.2-dev.tgz").
-        should be_false
+        should be(false)
 
     add_file("src", "foo/3.rb")
     builder = make_builder("bar", globs)
     builder.build
 
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.1-dev.tgz").
-        should be_true
+        should be(true)
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.2-dev.tgz").
-        should be_true
+        should be(true)
 
     remove_file("src", "foo/3.rb")
     builder = make_builder("bar", globs)
@@ -282,11 +279,11 @@ describe Bosh::Cli::PackageBuilder, "dev build" do
     builder.fingerprint.should == v1_fingerprint
 
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.1-dev.tgz").
-        should be_true
+        should be(true)
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.2-dev.tgz").
-        should be_true
+        should be(true)
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.3-dev.tgz").
-        should be_false
+        should be(false)
 
     # Now add packaging
     add_file("packages", "bar/packaging", "make install")
@@ -300,16 +297,16 @@ describe Bosh::Cli::PackageBuilder, "dev build" do
     builder.build
 
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.3-dev.tgz").
-        should be_true
+        should be(true)
 
     # And remove all
     builder = make_builder("bar", globs)
     builder.build
     builder.version.should == "0.4-dev"
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.4-dev.tgz").
-        should be_true
+        should be(true)
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.5-dev.tgz").
-        should be_false
+        should be(false)
   end
 
   it "stops if pre_packaging fails" do
@@ -325,18 +322,6 @@ describe Bosh::Cli::PackageBuilder, "dev build" do
                          "`bar' pre-packaging failed")
   end
 
-  it "prevents building final version with src alt" do
-    spec = {
-      "name" => "bar",
-      "files" => "foo/**/*"
-    }
-
-    lambda {
-      Bosh::Cli::PackageBuilder.new(spec, @release_dir,
-                                    true, mock("blobstore"))
-    }.should raise_error(/Please remove `src_alt' first/)
-  end
-
   it "bumps major dev version in sync with final version" do
     FileUtils.rm_rf(File.join(@release_dir, "src_alt"))
 
@@ -347,7 +332,7 @@ describe Bosh::Cli::PackageBuilder, "dev build" do
 
     builder.version.should == "0.1-dev"
 
-    blobstore = mock("blobstore")
+    blobstore = double("blobstore")
     blobstore.should_receive(:create).and_return("object_id")
     final_builder = Bosh::Cli::PackageBuilder.new({ "name" => "bar",
                                                     "files" => globs },
@@ -409,7 +394,7 @@ describe Bosh::Cli::PackageBuilder, "dev build" do
     add_files("src", %w(foo/foo.rb foo/lib/1.rb foo/lib/2.rb foo/README baz))
     globs = %w(foo/**/* baz)
 
-    blobstore = mock("blobstore")
+    blobstore = double("blobstore")
     blobstore.should_receive(:create).and_return("object_id")
 
     final_builder = Bosh::Cli::PackageBuilder.new(
@@ -467,15 +452,15 @@ describe Bosh::Cli::PackageBuilder, "dev build" do
 
     builder.version.should == "0.1-dev"
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.1-dev.tgz").
-        should be_false
+        should be(false)
 
     builder.dry_run = false
     builder.reload.build
     builder.version.should == "0.1-dev"
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.1-dev.tgz").
-        should be_true
+        should be(true)
 
-    blobstore = mock("blobstore")
+    blobstore = double("blobstore")
     blobstore.should_not_receive(:create)
     final_builder = Bosh::Cli::PackageBuilder.new(
       { "name" => "bar", "files" => globs }, @release_dir, true, blobstore)
@@ -491,9 +476,9 @@ describe Bosh::Cli::PackageBuilder, "dev build" do
     builder2.build
     builder2.version.should == "0.2-dev"
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.1-dev.tgz").
-        should be_true
+        should be(true)
     File.exists?(@release_dir + "/.dev_builds/packages/bar/0.2-dev.tgz").
-        should be_false
+        should be(false)
   end
 
   it "uses blobs directory to look up files as well" do
@@ -523,71 +508,93 @@ describe Bosh::Cli::PackageBuilder, "dev build" do
     s2.should == s1
   end
 
-  it "supports alternative src directory" do
-    add_file("src", "README.txt", "README contents")
-    add_file("src", "lib/1.rb", "puts 'Hello world'")
-    add_file("src", "lib/2.rb", "puts 'Goodbye world'")
-
-    builder = make_builder("A", %w(lib/*.rb README.*))
-    s1 = builder.fingerprint
-
-    add_file("src_alt", "README.txt", "README contents")
-    add_file("src_alt", "lib/1.rb", "puts 'Hello world'")
-    add_file("src_alt", "lib/2.rb", "puts 'Goodbye world'")
-
-    remove_files("src", %w(lib/1.rb))
-    builder.reload.fingerprint.should == s1
-  end
-
-  it "checks if glob top level dir is present in src_alt but doesn't match" do
-    add_file("src", "README.txt", "README contents")
-    add_file("src", "lib/1.rb", "puts 'Hello world'")
-    add_file("src", "lib/2.rb", "puts 'Goodbye world'")
-
-    builder = make_builder("A", %w(lib/*.rb README.*))
-
-    FileUtils.mkdir(File.join(@release_dir, "src_alt", "lib"))
-
-    lambda {
-      builder.fingerprint
-    }.should raise_error("Package `A' has a glob that doesn't match " +
-                         "in `src_alt' but matches in `src'. However " +
-                         "`src_alt/lib' exists, so this might be an error.")
-  end
-
-  it "doesn't allow glob to match files under more than one source directory" do
-    add_file("src", "README.txt", "README contents")
-    add_file("src", "lib/1.rb", "puts 'Hello world'")
-
-    builder = make_builder("A", %w(lib/*.rb README.*))
-    lambda {
-      builder.fingerprint
-    }.should_not raise_error
-
-    add_file("src_alt", "README.txt", "README contents")
-    remove_files("src", %w(README.txt lib/1.rb))
-
-    lambda {
-      builder.reload.fingerprint
-    }.should raise_error("Package `A' has a glob that resolves to " +
-                         "an empty file list: lib/*.rb")
-  end
-
   it "doesn't include the same path twice" do
     add_file("src", "test/foo/README.txt", "README contents")
     add_file("src", "test/foo/NOTICE.txt", "NOTICE contents")
-
     fp1 = make_builder("A", %w(test/**/*)).fingerprint
 
-    remove_file("src", "test/foo/NOTICE.txt")
-    add_file("blobs", "test/foo/NOTICE.txt", "NOTICE contents")
+    remove_file("src", "test/foo/NOTICE.txt")                   # src has test/foo
+    add_file("blobs", "test/foo/NOTICE.txt", "NOTICE contents") # blobs has test/foo
 
-    File.directory?(File.join(@release_dir, "src", "test", "foo")).
-      should be_true
+    File.directory?(File.join(@release_dir, "src", "test", "foo")).should be(true)
 
     fp2 = make_builder("A", %w(test/**/*)).fingerprint
-
     fp1.should == fp2
   end
 
+  describe "file overriding via src_alt" do
+    it "includes top-level files from src_alt instead of src" do
+      add_file("src", "file1", "original")
+
+      builder = make_builder("A", %w(file*))
+      s1 = builder.fingerprint
+
+      add_file("src", "file1", "altered")
+      add_file("src_alt", "file1", "original")
+      builder.reload.fingerprint.should == s1
+    end
+
+    it "includes top-level files from src if not present in src_alt" do
+      add_file("src", "file1", "original1")
+      add_file("src", "file2", "original2")
+      builder = make_builder("A", %w(file*))
+      s1 = builder.fingerprint
+
+      add_file("src", "file1", "altered1")
+      add_file("src_alt", "file1", "original1")
+      builder.reload.fingerprint.should == s1
+    end
+
+    it "includes top-level-dir files from src_alt instead of src" do
+      add_file("src", "dir1/file1", "original1")
+      builder = make_builder("A", %w(dir1/*))
+      s1 = builder.fingerprint
+
+      add_file("src", "dir1/file1", "altered1")
+      add_file("src_alt", "dir1/file1", "original1")
+      builder.reload.fingerprint.should == s1
+    end
+
+    it "does not include top-level-dir files from src if not present in src_alt" do
+      add_file("src", "dir1/file1", "original1")
+      builder = make_builder("A", %w(dir1/*))
+      s1 = builder.fingerprint
+
+      add_file("src", "dir1/file2", "new2")
+      add_file("src_alt", "dir1/file1", "original1")
+      builder.reload.fingerprint.should == s1
+    end
+
+    it "checks if glob top-level-dir is present in src_alt but doesn't match" do
+      add_file("src", "dir1/file1", "original1")
+      FileUtils.mkdir(File.join(@release_dir, "src_alt", "dir1"))
+
+      builder = make_builder("A", %w(dir1/*))
+
+      lambda {
+        builder.fingerprint
+      }.should raise_error(
+        "Package `A' has a glob that doesn't match " +
+        "in `src_alt' but matches in `src'. However " +
+        "`src_alt/dir1' exists, so this might be an error."
+       )
+    end
+
+    it "raises an error if glob does not match any files in src or src_alt" do
+      builder = make_builder("A", %w(dir1/*))
+
+      lambda {
+        builder.reload.fingerprint
+      }.should raise_error("Package `A' has a glob that resolves to an empty file list: dir1/*")
+    end
+
+    it "prevents building final version with src_alt" do
+      lambda {
+        Bosh::Cli::PackageBuilder.new({
+          "name" => "bar",
+          "files" => "foo/**/*"
+        }, @release_dir, true, double("blobstore"))
+      }.should raise_error(/Please remove `src_alt' first/)
+    end
+  end
 end

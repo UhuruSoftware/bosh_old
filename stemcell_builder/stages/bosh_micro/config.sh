@@ -13,14 +13,12 @@ then
   persist_dir bosh_micro_package_compiler_path
   persist_file bosh_micro_manifest_yml_path
   persist_file bosh_micro_release_tgz_path
-  persist_value system_parameters_infrastructure
+  persist_value stemcell_infrastructure
 fi
 
 if [ -z "${agent_gem_src_url:-}" ]; then
   mkdir -p $assets_dir/gems
-  cp -rvH $bosh_release_src_dir/package_compiler/* $assets_dir/gems
+  cp -rvH $bosh_release_src_dir/bosh-release/* $assets_dir/gems
 else
   persist_value agent_gem_src_url
 fi
-
-persist_value mcf_enabled

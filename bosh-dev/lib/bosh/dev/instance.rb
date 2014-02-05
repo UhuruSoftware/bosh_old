@@ -18,6 +18,7 @@ module Bosh
       end
 
       private
+
       def ip
         @ip ||= `bosh vms | grep #{name} | cut -d "|" -f 5 | cut -d "," -f 1`.strip
       end

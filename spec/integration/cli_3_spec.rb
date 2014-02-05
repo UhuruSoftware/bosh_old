@@ -7,10 +7,9 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 3' do
     Dir.chdir(TEST_RELEASE_DIR) do
       FileUtils.rm_rf('dev_releases')
 
-      run_bosh('create release', Dir.pwd)
-      run_bosh("target http://localhost:#{current_sandbox.director_port}")
-      run_bosh('login admin admin')
-      run_bosh('upload release', Dir.pwd)
+      run_bosh('create release', work_dir: Dir.pwd)
+      target_and_login
+      run_bosh('upload release', work_dir: Dir.pwd)
     end
 
     out = run_bosh('releases')
@@ -25,12 +24,11 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 3' do
     Dir.chdir(TEST_RELEASE_DIR) do
       FileUtils.rm_rf('dev_releases')
 
-      run_bosh('create release --with-tarball', Dir.pwd)
-      expect(File.exists?(release_1)).to be_true
+      run_bosh('create release --with-tarball', work_dir: Dir.pwd)
+      expect(File.exists?(release_1)).to be(true)
     end
 
-    run_bosh("target http://localhost:#{current_sandbox.director_port}")
-    run_bosh('login admin admin')
+    target_and_login
     run_bosh("upload release #{release_1}")
 
     Dir.chdir(TEST_RELEASE_DIR) do
@@ -38,8 +36,8 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 3' do
       begin
         FileUtils.touch(new_file)
 
-        run_bosh('create release --force --with-tarball', Dir.pwd)
-        expect(File.exists?(release_2)).to be_true
+        run_bosh('create release --force --with-tarball', work_dir: Dir.pwd)
+        expect(File.exists?(release_2)).to be(true)
       ensure
         FileUtils.rm_rf(new_file)
       end
@@ -69,12 +67,11 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 3' do
     Dir.chdir(TEST_RELEASE_DIR) do
       commit_hash = `git show-ref --head --hash=8 2> /dev/null`.split.first
 
-      run_bosh('create release', Dir.pwd)
-      expect(File.exists?(release_1)).to be_true
+      run_bosh('create release', work_dir: Dir.pwd)
+      expect(File.exists?(release_1)).to be(true)
 
-      run_bosh("target http://localhost:#{current_sandbox.director_port}")
-      run_bosh('login admin admin')
-      run_bosh("upload release #{release_1}", Dir.pwd)
+      target_and_login
+      run_bosh("upload release #{release_1}", work_dir: Dir.pwd)
 
       new_file = File.join('src', 'bar', 'bla')
       begin
@@ -82,13 +79,13 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 3' do
         # In an ephemeral git repo
         `git add .`
         `git commit -m 'second dev release'`
-        run_bosh('create release', Dir.pwd)
-        expect(File.exists?(release_2)).to be_true
+        run_bosh('create release', work_dir: Dir.pwd)
+        expect(File.exists?(release_2)).to be(true)
       ensure
         FileUtils.rm_rf(new_file)
       end
 
-      out = run_bosh("upload release #{release_2}", Dir.pwd)
+      out = run_bosh("upload release #{release_2}", work_dir: Dir.pwd)
       expect(out).to match regexp('Building tarball')
       expect(out).not_to match regexp('Checking if can repack')
       expect(out).not_to match regexp('Release repacked')
@@ -120,9 +117,8 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 3' do
   it 'cannot upload malformed release', no_reset: true do
     release_filename = spec_asset('release_invalid_checksum.tgz')
 
-    run_bosh("target http://localhost:#{current_sandbox.director_port}")
-    run_bosh('login admin admin')
-    out = run_bosh("upload release #{release_filename}", nil, failure_expected: true)
+    target_and_login
+    out = run_bosh("upload release #{release_filename}", failure_expected: true)
 
     expect(out).to match /Release is invalid, please fix, verify and upload again/
   end
@@ -131,8 +127,7 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 3' do
   it 'allows deleting a whole release' do
     release_filename = spec_asset('valid_release.tgz')
 
-    run_bosh("target http://localhost:#{current_sandbox.director_port}")
-    run_bosh('login admin admin')
+    target_and_login
     run_bosh("upload release #{release_filename}")
 
     out = run_bosh('delete release appcloud')
@@ -147,8 +142,7 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 3' do
   it 'allows deleting a particular release version' do
     release_filename = spec_asset('valid_release.tgz')
 
-    run_bosh("target http://localhost:#{current_sandbox.director_port}")
-    run_bosh('login admin admin')
+    target_and_login
     run_bosh("upload release #{release_filename}")
 
     out = run_bosh('delete release appcloud 0.1')

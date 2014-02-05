@@ -1,5 +1,3 @@
-# Copyright (c) 2009-2012 VMware, Inc.
-
 module Bosh::Cli
   class ParseTreeNode < Hash
     attr_accessor :command
@@ -36,7 +34,6 @@ module Bosh::Cli
       parse_global_options
 
       Config.interactive = !@options[:non_interactive]
-      Config.cache = Bosh::Cli::Cache.new(@options[:cache_dir])
       Config.poll_interval = @options[:poll_interval]
 
       load_plugins
@@ -59,19 +56,24 @@ module Bosh::Cli
         exit_code = command.run(@args, @options)
         exit(exit_code)
       rescue OptionParser::ParseError => e
-        say_err e.message
-        say_err "Usage: bosh #{command.usage_with_params.columnize(60, 7)}"
+        say_err(e.message)
+        nl
+        say_err("Usage: bosh #{command.usage_with_params.columnize(60, 7)}")
+        nl
         if command.has_options?
           say(command.options_summary.indent(7))
         end
+        exit(1)
       end
 
     rescue OptionParser::ParseError => e
-      say_err e.message
-      say_err @option_parser.to_s
+      say_err(e.message)
+      say_err(@option_parser.to_s)
       exit(1)
+
     rescue Bosh::Cli::CliError => e
-      say_err e.message
+      say_err(e.message)
+      nl
       exit(e.exit_code)
     end
 
@@ -111,9 +113,7 @@ module Bosh::Cli
       opts.on("-c", "--config FILE", config_desc) do |file|
         @options[:config] = file
       end
-      opts.on("-C", "--cache-dir DIR", "Override cache directory") do |dir|
-        @options[:cache_dir] = dir
-      end
+
       opts.on("--[no-]color", "Toggle colorized output") do |v|
         Config.colorize = v
       end

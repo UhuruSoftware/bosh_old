@@ -10,8 +10,8 @@ module Bosh::Agent
     # blobstore. It returns the uploaded blob's blobstore_id & sha1.
     #
     # This message has the following uses:
-    # * the package_compiler (within the stemcell_builder) to
-    #   compile packages to the microbosh/mcf stemcell's local blobstore
+    # * the bosh-release (within the stemcell_builder) to
+    #   compile packages to the microbosh's local blobstore
     # * the director requests packages be compiled during deployment
     #   if they are not yet compiled and available in the blobstore
     #
@@ -35,7 +35,7 @@ module Bosh::Agent
       def initialize(args)
         bsc_provider = Bosh::Agent::Config.blobstore_provider
         bsc_options = Bosh::Agent::Config.blobstore_options
-        @blobstore_client = Bosh::Blobstore::Client.create(bsc_provider, bsc_options)
+        @blobstore_client = Bosh::Blobstore::Client.safe_create(bsc_provider, bsc_options)
         @blobstore_id, @sha1, @package_name, @package_version, @dependencies = args
 
         @base_dir = Bosh::Agent::Config.base_dir
@@ -58,8 +58,6 @@ module Bosh::Agent
 
       def start
         begin
-          # TODO implement sha1 verification
-          # TODO propagate errors
           install_dependencies
           get_source_package
           unpack_source_package
@@ -127,7 +125,6 @@ module Bosh::Agent
 
         FileUtils.mkdir_p compile_dir
         Dir.chdir(compile_dir) do
-          # TODO: error handling
           output = `tar -zxf #{@source_file} 2>&1`
           @logger.info(output)
           # stick the output in the blobstore
@@ -195,7 +192,6 @@ module Bosh::Agent
           # Prevent these from getting inhereted from the agent
           %w{GEM_HOME BUNDLE_GEMFILE RUBYOPT}.each { |key| ENV.delete(key) }
 
-          # TODO: error handling
           ENV['BOSH_COMPILE_TARGET'] = compile_dir
           ENV['BOSH_INSTALL_TARGET'] = pkg_link_dst
           ENV['BOSH_PACKAGE_NAME'] = @package_name.to_s

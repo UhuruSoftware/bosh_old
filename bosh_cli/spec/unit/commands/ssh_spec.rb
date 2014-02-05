@@ -6,7 +6,7 @@ require 'net/ssh/gateway'
 describe Bosh::Cli::Command::Ssh do
   let(:command) { described_class.new }
   let(:net_ssh) { double('ssh') }
-  let(:director) { double(Bosh::Cli::Director) }
+  let(:director) { double(Bosh::Cli::Client::Director) }
   let(:deployment) { 'mycloud' }
 
   let(:manifest) do
@@ -45,12 +45,6 @@ describe Bosh::Cli::Command::Ssh do
         expect {
           command.shell('dea/1')
         }.to raise_error(Bosh::Cli::CliError, 'Please choose deployment first')
-      end
-
-      it 'should fail to setup ssh when a job name is not given' do
-        expect {
-          command.shell
-        }.to raise_error(Bosh::Cli::CliError, 'Please provide job name')
       end
 
       it 'should fail to setup ssh when a job index is not an Integer' do
@@ -104,9 +98,16 @@ describe Bosh::Cli::Command::Ssh do
           }
         end
 
-        it 'should implicitly chooses the only instance' do
+        it 'should implicitly chooses the only instance if job index not provided' do
+          command.should_not_receive(:choose)
           command.should_receive(:setup_interactive_shell).with('dea', 0)
           command.shell('dea')
+        end
+
+        it 'should implicitly chooses the only instance if job name not provided' do
+          command.should_not_receive(:choose)
+          command.should_receive(:setup_interactive_shell).with('dea', 0)
+          command.shell
         end
       end
 
@@ -129,6 +130,12 @@ describe Bosh::Cli::Command::Ssh do
             command.shell('dea')
           }.to raise_error(Bosh::Cli::CliError,
                            'You should specify the job index. There is more than one instance of this job type.')
+        end
+
+        it 'should prompt for an instance if job name not given' do
+          command.should_receive(:choose).and_return(['dea', 3])
+          command.should_receive(:setup_interactive_shell).with('dea', 3)
+          command.shell
         end
       end
     end
@@ -175,7 +182,7 @@ describe Bosh::Cli::Command::Ssh do
         end
 
         it 'should setup ssh with gateway host' do
-          Net::SSH::Gateway.should_receive(:new).with(gateway_host, gateway_user).and_return(net_ssh)
+          Net::SSH::Gateway.should_receive(:new).with(gateway_host, gateway_user, {}).and_return(net_ssh)
           net_ssh.should_receive(:open).with(anything, 22).and_return(2345)
           Process.should_receive(:spawn).with('ssh', 'testable_user@localhost', '-p', '2345')
 
@@ -198,7 +205,7 @@ describe Bosh::Cli::Command::Ssh do
           end
 
           it 'should setup ssh with gateway host and user' do
-            Net::SSH::Gateway.should_receive(:new).with(gateway_host, gateway_user).and_return(net_ssh)
+            Net::SSH::Gateway.should_receive(:new).with(gateway_host, gateway_user, {}).and_return(net_ssh)
             net_ssh.should_receive(:open).with(anything, 22).and_return(2345)
             Process.should_receive(:spawn).with('ssh', 'testable_user@localhost', '-p', '2345')
 
@@ -213,8 +220,25 @@ describe Bosh::Cli::Command::Ssh do
             command.shell('dea/0')
           end
 
+          it 'should setup ssh with gateway host and user and identity file' do
+            Net::SSH::Gateway.should_receive(:new).with(gateway_host, gateway_user, {keys: ['/tmp/private_file']}).and_return(net_ssh)
+            net_ssh.should_receive(:open).with(anything, 22).and_return(2345)
+            Process.should_receive(:spawn).with('ssh', 'testable_user@localhost', '-p', '2345')
+
+            director.should_receive(:setup_ssh).and_return([:done, 42])
+            director.should_receive(:get_task_result_log).with(42).
+                and_return(JSON.generate([{'status' => 'success', 'ip' => '127.0.0.1'}]))
+            director.should_receive(:cleanup_ssh)
+
+            net_ssh.should_receive(:close)
+            net_ssh.should_receive(:shutdown!)
+
+            command.add_option(:gateway_identity_file, '/tmp/private_file')
+            command.shell('dea/0')
+          end
+
           it 'should fail to setup ssh with gateway host and user when authentication fails' do
-            Net::SSH::Gateway.should_receive(:new).with(gateway_host, gateway_user).and_raise(Net::SSH::AuthenticationFailed)
+            Net::SSH::Gateway.should_receive(:new).with(gateway_host, gateway_user, {}).and_raise(Net::SSH::AuthenticationFailed)
 
             director.should_receive(:setup_ssh).and_return([:done, 42])
             director.should_receive(:get_task_result_log).with(42).

@@ -1,7 +1,7 @@
 # Copyright (c) 2009-2012 VMware, Inc.
+require 'bosh_agent/monit_client'
 
 module Bosh::Agent
-
   # A good chunk of this code is lifted from the implementation of POSIX::Spawn::Child
   class Monit
     BUFSIZE = (32 * 1024)
@@ -63,7 +63,7 @@ module Bosh::Agent
         end
 
         user, cred = monit_credentials
-        MonitApi::Client.new("https://#{user}:#{cred}@127.0.0.1:2822", :logger => logger)
+        MonitClient.new("https://#{user}:#{cred}@127.0.0.1:2822", :logger => logger)
       end
 
       def random_credential
@@ -266,9 +266,10 @@ module Bosh::Agent
         return "running" unless @enabled
         status = get_status(num_retries)
 
+        return "starting" if status.any? { |_, job_status| starting?(job_status) }
+
         not_running = status.reject do |name, data|
           # break early if any service is initializing
-          return "starting" if data[:monitor] == :init
           # at least with monit_api a stopped services is still running
           (data[:monitor] == :yes && data[:status][:message] == "running")
         end
@@ -277,6 +278,10 @@ module Bosh::Agent
       rescue => e
         logger.info("Unable to determine job state: #{e}")
         "unknown"
+      end
+
+      def starting?(status)
+        status[:monitor] == :init
       end
 
     end
@@ -305,7 +310,6 @@ module Bosh::Agent
 
       status = Process.waitpid(pid) rescue nil
     rescue => e
-      # TODO: send alert to HM
       @logger.error("Failed to run Monit: #{e.inspect} #{e.backtrace}")
 
       [stdin, stdout, stderr].each { |fd| fd.close rescue nil }

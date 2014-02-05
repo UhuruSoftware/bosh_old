@@ -17,19 +17,19 @@ describe Bosh::AwsCloud::InstanceManager do
 
     it "returns false if instance does not exist" do
       fake_aws_instance.should_receive(:exists?).and_return(false)
-      instance_manager.has_instance?(instance_id).should be_false
+      instance_manager.has_instance?(instance_id).should be(false)
     end
 
     it "returns true if instance does exist" do
       fake_aws_instance.should_receive(:exists?).and_return(true)
       fake_aws_instance.should_receive(:status).and_return(:running)
-      instance_manager.has_instance?(instance_id).should be_true
+      instance_manager.has_instance?(instance_id).should be(true)
     end
 
     it "returns false if instance exists but is terminated" do
       fake_aws_instance.should_receive(:exists?).and_return(true)
       fake_aws_instance.should_receive(:status).and_return(:terminated)
-      instance_manager.has_instance?(instance_id).should be_false
+      instance_manager.has_instance?(instance_id).should be(false)
     end
   end
 
@@ -165,7 +165,7 @@ describe Bosh::AwsCloud::InstanceManager do
     end
 
     describe "#set_vpc_parameters" do
-      let(:fake_aws_subnet) { mock("aws_subnet") }
+      let(:fake_aws_subnet) { double("aws_subnet") }
 
       before do
         region.stub(:subnets).and_return({"sub-123456" => fake_aws_subnet})

@@ -27,7 +27,7 @@ describe Bosh::Cli::ReleaseBuilder do
                                       "bosh_release-0.1-dev.tgz")
 
     builder.tarball_path.should == expected_tarball_path
-    File.file?(expected_tarball_path).should be_true
+    File.file?(expected_tarball_path).should be(true)
   end
 
   it 'should include git hash and uncommitted change state in manifest' do
@@ -37,7 +37,7 @@ describe Bosh::Cli::ReleaseBuilder do
 
     manifest = Psych.load_file(builder.manifest_path)
     manifest['commit_hash'].should == '12345678'
-    manifest['uncommitted_changes'].should be_true
+    manifest['uncommitted_changes'].should be(true)
   end
 
   it "doesn't build a new release if nothing has changed" do
@@ -47,26 +47,26 @@ describe Bosh::Cli::ReleaseBuilder do
 
     File.file?(File.join(@release_dir, "dev_releases",
                          "bosh_release-0.1-dev.tgz")).
-        should be_true
+        should be(true)
     File.file?(File.join(@release_dir, "dev_releases",
                          "bosh_release-0.2-dev.tgz")).
-        should be_false
+        should be(false)
   end
 
   it "has a list of jobs affected by building this release" do
-    job1 = mock(:job, :new_version? => true,
+    job1 = double(:job, :new_version? => true,
                 :packages => %w(bar baz), :name => "job1")
-    job2 = mock(:job, :new_version? => false,
+    job2 = double(:job, :new_version? => false,
                 :packages => %w(foo baz), :name => "job2")
-    job3 = mock(:job, :new_version? => false,
+    job3 = double(:job, :new_version? => false,
                 :packages => %w(baz zb), :name => "job3")
-    job4 = mock(:job, :new_version? => false,
+    job4 = double(:job, :new_version? => false,
                 :packages => %w(bar baz), :name => "job4")
 
-    package1 = mock(:package, :name => "foo", :new_version? => true)
-    package2 = mock(:package, :name => "bar", :new_version? => false)
-    package3 = mock(:package, :name => "baz", :new_version? => false)
-    package4 = mock(:package, :name => "zb", :new_version? => true)
+    package1 = double(:package, :name => "foo", :new_version? => true)
+    package2 = double(:package, :name => "bar", :new_version? => false)
+    package3 = double(:package, :name => "baz", :new_version? => false)
+    package4 = double(:package, :name => "zb", :new_version? => true)
 
     builder = Bosh::Cli::ReleaseBuilder.new(@release,
                                             [package1, package2,
@@ -95,7 +95,7 @@ describe Bosh::Cli::ReleaseBuilder do
   end
 
   it "has packages and jobs fingerprints in spec" do
-    job = mock(
+    job = double(
       Bosh::Cli::JobBuilder,
       :name => "job1",
       :version => "1.1",
@@ -105,7 +105,7 @@ describe Bosh::Cli::ReleaseBuilder do
       :checksum => "cafebad"
     )
 
-    package = mock(
+    package = double(
       Bosh::Cli::PackageBuilder,
       :name => "foo",
       :version => "42",

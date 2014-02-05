@@ -9,8 +9,7 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 2' do
     # That's the contents of image file:
     expected_id = Digest::SHA1.hexdigest("STEMCELL\n")
 
-    run_bosh("target http://localhost:#{current_sandbox.director_port}")
-    run_bosh('login admin admin')
+    target_and_login
     out = run_bosh("upload stemcell #{stemcell_filename}")
 
     expect(out).to match /Stemcell uploaded and created/
@@ -30,8 +29,7 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 2' do
     # That's the contents of image file:
     expected_id = Digest::SHA1.hexdigest("STEMCELL\n")
 
-    run_bosh("target http://localhost:#{current_sandbox.director_port}")
-    run_bosh('login admin admin')
+    target_and_login
     out = run_bosh("upload stemcell #{stemcell_filename}")
     expect(out).to match /Stemcell uploaded and created/
 
@@ -48,7 +46,7 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 2' do
     Dir.chdir(TEST_RELEASE_DIR) do
       FileUtils.rm_rf('dev_releases')
 
-      out = run_bosh('create release --final', Dir.pwd, failure_expected: true)
+      out = run_bosh('create release --final', work_dir: Dir.pwd, failure_expected: true)
       expect(out).to match(/Can't create final release without blobstore secret/)
     end
   end
@@ -57,8 +55,7 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 2' do
   it 'can upload a release' do
     release_filename = spec_asset('valid_release.tgz')
 
-    run_bosh("target http://localhost:#{current_sandbox.director_port}")
-    run_bosh('login admin admin')
+    target_and_login
     out = run_bosh("upload release #{release_filename}")
 
     expect(out).to match /release uploaded/i
@@ -71,27 +68,25 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 2' do
   it 'fails to upload a release that is already uploaded' do
     release_filename = spec_asset('valid_release.tgz')
 
-    run_bosh("target http://localhost:#{current_sandbox.director_port}")
-    run_bosh('login admin admin')
+    target_and_login
     run_bosh("upload release #{release_filename}")
-    out = run_bosh("upload release #{release_filename}", nil, failure_expected: true)
+    out = run_bosh("upload release #{release_filename}", failure_expected: true)
 
     expect(out).to match 'This release version has already been uploaded'
   end
 
   context 'when deployed' do
     it 'fails to delete release in use but deletes a different release' do
-      run_bosh("target http://localhost:#{current_sandbox.director_port}")
-      run_bosh('login admin admin')
+      target_and_login
 
-      run_bosh('create release', TEST_RELEASE_DIR)
-      run_bosh('upload release', TEST_RELEASE_DIR)
+      run_bosh('create release', work_dir: TEST_RELEASE_DIR)
+      run_bosh('upload release', work_dir: TEST_RELEASE_DIR)
 
       # change something in TEST_RELEASE_DIR
       FileUtils.touch(File.join(TEST_RELEASE_DIR, 'src', 'bar', 'pretend_something_changed'))
 
-      run_bosh('create release --force', TEST_RELEASE_DIR)
-      run_bosh('upload release', TEST_RELEASE_DIR)
+      run_bosh('create release --force', work_dir: TEST_RELEASE_DIR)
+      run_bosh('upload release', work_dir: TEST_RELEASE_DIR)
 
       run_bosh("upload stemcell #{spec_asset('valid_stemcell.tgz')}")
 
@@ -100,7 +95,7 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 2' do
 
       run_bosh('deploy')
 
-      out = run_bosh('delete release bosh-release', nil, failure_expected: true)
+      out = run_bosh('delete release bosh-release', failure_expected: true)
       expect(out).to match /Error 30007: Release `bosh-release' is still in use/
 
       out = run_bosh('delete release bosh-release 0.2-dev')
@@ -118,17 +113,15 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage 2' do
 
       new_file = File.join('src', 'bar', 'bla')
       FileUtils.touch(new_file)
-      run_bosh('create release --force', Dir.pwd)
+      run_bosh('create release --force', work_dir: Dir.pwd)
       FileUtils.rm_rf(new_file)
-      expect(File.exists?(release_1)).to be_true
+      expect(File.exists?(release_1)).to be(true)
       release_manifest = Psych.load_file(release_1)
       expect(release_manifest['commit_hash']).to eq commit_hash
-      expect(release_manifest['uncommitted_changes']).to be_true
+      expect(release_manifest['uncommitted_changes']).to be(true)
 
-      run_bosh("target http://localhost:#{current_sandbox.director_port}")
-      run_bosh('login admin admin')
-      run_bosh('upload release', Dir.pwd)
-
+      target_and_login
+      run_bosh('upload release', work_dir: Dir.pwd)
     end
 
     expect_output('releases', <<-OUT)

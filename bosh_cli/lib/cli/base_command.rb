@@ -6,14 +6,8 @@ module Bosh::Cli
       extend Bosh::Cli::CommandDiscovery
       include Bosh::Cli::DeploymentHelper
 
-      attr_accessor :options
-      attr_reader :work_dir
-      attr_reader :runner
-
-      attr_accessor :out
-
-      # @return [Array] Arguments passed to command handler
-      attr_accessor :args
+      attr_accessor :options, :out, :args
+      attr_reader :work_dir, :exit_code, :runner
 
       DEFAULT_DIRECTOR_PORT = 25555
 
@@ -26,11 +20,6 @@ module Bosh::Cli
         @exit_code = 0
         @out = nil
         @args = []
-      end
-
-      # @return [Bosh::Cli::Cache] Current CLI cache
-      def cache
-        Config.cache
       end
 
       # @return [Bosh::Cli::Config] Current configuration
@@ -52,7 +41,7 @@ module Bosh::Cli
       end
 
       def director
-        @director ||= Bosh::Cli::Director.new(
+        @director ||= Bosh::Cli::Client::Director.new(
             target, username, password, @options.select { |k, _| k == :no_track })
       end
 
@@ -71,7 +60,7 @@ module Bosh::Cli
       end
 
       def logged_in?
-        username && password
+        !!(username && password)
       end
 
       def non_interactive?
@@ -122,16 +111,7 @@ module Bosh::Cli
         options[:target] || config.target_name || target_url
       end
 
-      # Sets or returns command exit code
-      # @param [optional,Integer] code If param is given, sets exit code. If
-      #   it's nil, returns previously set exit_code
-      def exit_code(code = nil)
-        if code
-          @exit_code = code
-        else
-          @exit_code
-        end
-      end
+      protected
 
       # Prints director task completion report. Note that event log usually
       # contains pretty detailed error report and other UI niceties, so most
@@ -155,33 +135,11 @@ module Bosh::Cli
         end
 
         unless [:running, :done].include?(status)
-          exit_code(1)
+          @exit_code = 1
         end
 
         say("\n#{report}") if report
         say("\nFor a more detailed error report, run: bosh task #{task_id} --debug") if status == :error
-      end
-
-      protected
-
-      # @param [Array] args
-      # @return [Array] job, index, command
-      def parse_args(args)
-        job = args.shift
-        err('Please provide job name') if job.nil?
-        job, index = job.split('/', 2)
-
-        if index
-          if index =~ /^\d+$/
-            index = index.to_i
-          else
-            err('Invalid job index, integer number expected')
-          end
-        elsif args[0] =~ /^\d+$/
-          index = args.shift.to_i
-        end
-
-        [job, index, args]
       end
 
       def auth_required

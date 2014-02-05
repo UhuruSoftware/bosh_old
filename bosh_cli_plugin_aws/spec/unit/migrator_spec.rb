@@ -10,7 +10,7 @@ describe Bosh::Aws::Migrator do
 
   let(:config) { {'aws' => {}, 'name' => 'deployment-name', 'vpc' => {'domain' => 'deployment-name.foo.com'}} }
   let(:subject) { described_class.new(config) }
-  let(:mock_s3) { mock("Bosh::Aws::S3").as_null_object }
+  let(:mock_s3) { double("Bosh::Aws::S3").as_null_object }
 
   after do
     FileUtils.rm_rf(@tempdir)
@@ -22,7 +22,7 @@ describe Bosh::Aws::Migrator do
     @time = Time.now
     Time.stub(:new) { @time }
 
-    Bosh::Aws::MigrationHelper.stub!(:aws_migration_directory).and_return(@tempdir)
+    Bosh::Aws::MigrationHelper.stub(:aws_migration_directory).and_return(@tempdir)
 
     Bosh::Aws::S3.stub(:new).and_return(mock_s3)
     mock_s3.stub(:fetch_object_contents).and_return(nil)
@@ -177,7 +177,7 @@ describe Bosh::Aws::Migrator do
       end
 
       it 'should need a migration if S3 file is missing' do
-        subject.needs_migration?.should be_true
+        subject.needs_migration?.should be(true)
       end
 
       it "should need a migration if S3 file has migrations, but not all" do
@@ -186,7 +186,7 @@ describe Bosh::Aws::Migrator do
             with('deployment-name-bosh-artifacts', "aws_migrations/migrations.yaml").
             and_return(YAML.dump(@expected_migrations[0..5].collect{|m|m.to_hash}))
 
-        subject.needs_migration?.should be_true
+        subject.needs_migration?.should be(true)
       end
 
       it 'should not need a migration if S3 file has all the migrations' do
@@ -195,7 +195,7 @@ describe Bosh::Aws::Migrator do
             with('deployment-name-bosh-artifacts', "aws_migrations/migrations.yaml").
             and_return(YAML.dump(@expected_migrations.collect{|m|m.to_hash}))
 
-        subject.needs_migration?.should be_false
+        subject.needs_migration?.should be(false)
       end
     end
   end

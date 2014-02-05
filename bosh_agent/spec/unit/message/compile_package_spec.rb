@@ -1,14 +1,11 @@
-# Copyright (c) 2009-2012 VMware, Inc.
-
 require "spec_helper"
 
 describe Bosh::Agent::Message::CompilePackage do
-
-  before(:each) do
-    Bosh::Agent::Config.blobstore_provider = "simple"
-    Bosh::Agent::Config.blobstore_options = {}
-    @httpclient = mock("httpclient")
-    HTTPClient.stub!(:new).and_return(@httpclient)
+  before do
+    Bosh::Agent::Config.blobstore_provider = 'simple'
+    Bosh::Agent::Config.blobstore_options = { 'fake-key' => 'fake-value' }
+    @httpclient = double("httpclient")
+    HTTPClient.stub(:new).and_return(@httpclient)
 
     Bosh::Agent::Config.agent_id = Time.now.to_i
 
@@ -22,28 +19,29 @@ describe Bosh::Agent::Message::CompilePackage do
   end
 
   it "should have a blobstore client" do
+    blobstore_client = double('fake-blobstore-client')
+    Bosh::Blobstore::Client
+      .should_receive(:safe_create)
+      .with('simple', { 'fake-key' => 'fake-value' })
+      .and_return(blobstore_client)
     handler = Bosh::Agent::Message::CompilePackage.new(nil)
-    handler.blobstore_client.
-        should be_an_instance_of(Bosh::Blobstore::SimpleBlobstoreClient)
+    expect(handler.blobstore_client).to eq(blobstore_client)
   end
 
-
-  # TODO: this is essentially re-testing the blobstore client,
-  # but I didnt know the API well enough
   it "should unpack a package" do
     dummy_compile_data
 
     package_file = File.join(@handler.compile_base, "tmp",
                              @handler.blobstore_id)
-    File.exist?(package_file).should be_false
+    File.exist?(package_file).should be(false)
     @handler.get_source_package
-    File.exist?(package_file).should be_true
+    File.exist?(package_file).should be(true)
 
     compile_dir = File.join(@handler.compile_base, @handler.package_name)
-    File.directory?(compile_dir).should be_false
+    File.directory?(compile_dir).should be(false)
     @handler.unpack_source_package
-    File.directory?(compile_dir).should be_true
-    File.exist?(File.join(compile_dir, "packaging")).should be_true
+    File.directory?(compile_dir).should be(true)
+    File.exist?(File.join(compile_dir, "packaging")).should be(true)
   end
 
   it "should compile a package" do
@@ -55,7 +53,7 @@ describe Bosh::Agent::Message::CompilePackage do
     @handler.compile
     dummy_file = File.join(@handler.install_base, @handler.package_name,
                            @handler.package_version.to_s, "dummy.txt")
-    File.exist?(dummy_file).should be_true
+    File.exist?(dummy_file).should be(true)
   end
 
   it "should fail packaging script returns a non-zero exit code" do
@@ -141,8 +139,8 @@ describe Bosh::Agent::Message::CompilePackage do
 
   def dummy_compile_setup(data)
     FileUtils.rm_rf @handler.compile_base
-    response = mock("response")
-    response.stub!(:status).and_return(200)
+    response = double("response")
+    response.stub(:status).and_return(200)
     get_args = [ "/resources/some_blobstore_id", {}, {} ]
     @httpclient.should_receive(:get).with(*get_args).and_yield(data).
         and_return(response)

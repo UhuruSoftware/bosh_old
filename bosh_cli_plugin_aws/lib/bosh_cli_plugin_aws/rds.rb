@@ -7,13 +7,15 @@ module Bosh
           :allocated_storage => 5,
           :db_instance_class => "db.t1.micro",
           :engine => "mysql",
-          :multi_az => true
+          :multi_az => true,
+          :engine_version => "5.5.31"
       }
       DEFAULT_RDS_PROTOCOL = :tcp
       DEFAULT_MYSQL_PORT = 3306
 
       def initialize(credentials)
         @credentials = credentials
+        @aws_provider = AwsProvider.new(@credentials)
       end
 
       def create_database(name, subnet_ids, vpc_id, options = {})
@@ -153,14 +155,16 @@ module Bosh
       end
 
       def aws_rds
-        @aws_rds ||= ::AWS::RDS.new(@credentials)
+        aws_provider.rds
       end
 
       def aws_rds_client
-        @aws_rds_client ||= ::AWS::RDS::Client.new(@credentials)
+        aws_provider.rds_client
       end
 
       private
+
+      attr_reader :aws_provider
 
       def generate_user
         generate_credential("u", 7)

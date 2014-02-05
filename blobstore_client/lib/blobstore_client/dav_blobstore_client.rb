@@ -11,9 +11,16 @@ module Bosh
       def initialize(options)
         super(options)
         @client = HTTPClient.new
+
+        if @options[:ssl_no_verify]
+          @client.ssl_config.verify_mode = OpenSSL::SSL::VERIFY_NONE
+        end
+
         @endpoint = @options[:endpoint]
+
         #@bucket = @options[:bucket] || "resources" # dav (or simple) doesn't support buckets
         @headers = {'Translate' => 'f'}
+
         user = @options[:user]
         password = @options[:password]
 
@@ -23,8 +30,8 @@ module Bosh
         @client.keep_alive_timeout = @options[:keep_alive_timeout] if @options[:keep_alive_timeout]
 
         if user && password
-          @headers["Authorization"] = "Basic " +
-              Base64.encode64("#{user}:#{password}").strip
+          @headers['Authorization'] = 'Basic ' +
+            Base64.encode64("#{user}:#{password}").strip
         end
       end
 
@@ -38,9 +45,8 @@ module Bosh
         id ||= generate_object_id
 
         response = @client.put(url(id), file, @headers)
-        if response.status != 201
-          raise BlobstoreError, "Could not create object, #{response.status}/#{response.content}"
-        end
+
+        raise BlobstoreError, "Could not create object, #{response.status}/#{response.content}" if response.status != 201
 
         id
       end
@@ -59,17 +65,17 @@ module Bosh
         unless [200, 206].include? response.status
           raise BlobstoreError, "Could not fetch object, #{response.status}/#{response.content}"
         end
+
       end
 
       def delete_object(id)
         response = @client.delete(url(id), @headers)
-        if response.status != 204
-          raise BlobstoreError, "Could not delete object, #{response.status}/#{response.content}"
-        end
+
+        raise BlobstoreError, "Could not delete object, #{response.status}/#{response.content}" if response.status != 204
       end
 
       def object_exists?(id)
-        response = @client.head(url(id), :header => @headers)
+        response = @client.head(url(id), header: @headers)
         if response.status == 200
           true
         elsif response.status == 404

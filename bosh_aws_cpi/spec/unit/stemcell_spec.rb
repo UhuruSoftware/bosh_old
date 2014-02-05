@@ -17,6 +17,16 @@ describe Bosh::AwsCloud::Stemcell do
     end
   end
 
+  describe "#image_id" do
+    let(:fake_aws_ami) { double("image", id: "my-id") }
+    let(:region) { double("region") }
+
+    it "returns the id of the ami object" do
+      stemcell = described_class.new(region, fake_aws_ami)
+      stemcell.image_id.should eq('my-id')
+    end
+  end
+
   describe "#delete" do
     let(:fake_aws_ami) { double("image", exists?: true, id: "ami-xxxxxxxx") }
     let(:region) { double("region", images: {'ami-exists' => fake_aws_ami}) }
@@ -46,10 +56,27 @@ describe Bosh::AwsCloud::Stemcell do
       end
       # AWS::EC2::Errors::AuthFailure
     end
+
+    context 'when the AMI is not found after deletion' do
+      it 'should not propagate a AWS::Core::Resource::NotFound error' do
+        stemcell = described_class.new(region, fake_aws_ami)
+
+        stemcell.should_receive(:memoize_snapshots).ordered
+        fake_aws_ami.should_receive(:deregister).ordered
+        resource_wait = double('Bosh::AwsCloud::ResourceWait')
+        Bosh::AwsCloud::ResourceWait.stub(new: resource_wait)
+        resource_wait.stub(:for_resource).with(
+          resource: fake_aws_ami, errors: [], target_state: :deleted, state_method: :state).and_raise(
+          AWS::Core::Resource::NotFound)
+        stemcell.should_receive(:delete_snapshots).ordered
+
+        stemcell.delete
+      end
+    end
   end
 
   describe "#memoize_snapshots" do
-    let(:fake_aws_object) { double("fake", :to_h => {
+    let(:fake_aws_object) { double("fake", :to_hash => {
         "/dev/foo" => {:snapshot_id => 'snap-xxxxxxxx'}
     })}
     let(:fake_aws_ami) do
@@ -74,7 +101,7 @@ describe Bosh::AwsCloud::Stemcell do
     let(:region) do
       region = double("region")
       region.stub(:images => {'ami-exists' => fake_aws_ami})
-      region.stub_chain(:snapshots, :[] => snapshot)
+      region.stub_chain(:snapshots, :[]).and_return(snapshot)
       region
     end
 

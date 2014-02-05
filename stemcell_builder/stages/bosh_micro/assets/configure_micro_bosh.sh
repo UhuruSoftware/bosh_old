@@ -15,7 +15,7 @@ agent_gem_src_url=$2
 
 bosh_src_dir=/var/vcap/bosh/src/micro_bosh
 bosh_app_dir=/var/vcap
-blobstore_path=file://${bosh_app_dir}/micro_bosh/data/cache
+blobstore_path=${bosh_app_dir}/micro_bosh/data/cache
 agent_host=localhost
 agent_port=6969
 agent_uri=https://vcap:vcap@${agent_host}:${agent_port}
@@ -25,19 +25,32 @@ export HOME=/root
 
 if [ -z "${agent_gem_src_url:-}" ]; then
 (
-  cd ${bosh_src_dir}/package_compiler/gems
-  gem install package_compiler --no-rdoc --no-ri -l -w
+  cd ${bosh_src_dir}/bosh-release/gems
+  gem install bosh-release --no-rdoc --no-ri -l -w
 )
 else
-  gem install package_compiler -r --no-rdoc --no-ri -w --pre --source ${agent_gem_src_url}
+  gem install bosh-release -r --no-rdoc --no-ri -w --pre --source ${agent_gem_src_url}
 fi
 
 mkdir -p ${bosh_app_dir}/bosh/blob
 
 echo "Starting micro bosh compilation"
 
+
+cat > ${bosh_app_dir}/bosh/settings.json << EOF
+{
+  "agent_id": "not_configured",
+  "mbus": "$agent_uri",
+  "blobstore": {
+    "provider": "local",
+    "options": {
+      "blobstore_path": "$blobstore_path"
+    }
+  }
+}
+EOF
 # Start agent
-/var/vcap/bosh/bin/bosh_agent -I ${infrastructure} -n ${agent_uri} -s ${blobstore_path} -p local &
+/var/vcap/bosh/bin/bosh_agent -I dummy &
 agent_pid=$!
 echo "Starting BOSH Agent for compiling micro bosh package, agent pid is $agent_pid"
 
@@ -51,8 +64,7 @@ function wait_agent {
 }
 wait_agent ${agent_host} ${agent_port}
 
-# Start compiler
-package_compiler \
+bosh-release \
   --cpi ${infrastructure} \
   compile \
     ${bosh_src_dir}/release.yml \
@@ -78,3 +90,4 @@ kill_agent 0 || kill_agent 9
 # Clean out src
 cd /var/tmp
 rm -fr ${bosh_app_dir}/bosh/src
+rm ${bosh_app_dir}/bosh/settings.json

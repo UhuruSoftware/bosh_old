@@ -27,14 +27,20 @@ module Bosh::AwsCloud
 
       delete_snapshots
       logger.info("deleted stemcell '#{id}'")
+    # The following suppression of AuthFailure is potentially dangerous
+    # But we have to do it here because we need to be compatible with existing
+    # light stemcells in BOSH DB which appear to be "heavy".
     rescue AWS::EC2::Errors::AuthFailure => e
       # If we get an auth failure from the deregister call, it means we don't own the AMI
       # and we were just faking it, so we can just return pretending that we deleted it.
-      # TODO we could use iam.client.get_user[:user][:user_id] to see if it is owned by us.
       logger.info("deleted fake stemcell '#{id}")
     end
 
     def id
+      ami.id
+    end
+
+    def image_id
       ami.id
     end
 
@@ -43,9 +49,9 @@ module Bosh::AwsCloud
     end
 
     def memoize_snapshots
-      # .to_h is used as the AWS API documentation isn't trustworthy:
+      # .to_hash is used as the AWS API documentation isn't trustworthy:
       # it says block_device_mappings retruns a Hash, but in reality it flattens it!
-      ami.block_device_mappings.to_h.each do |device, map|
+      ami.block_device_mappings.to_hash.each do |device, map|
         snapshot_id = map[:snapshot_id]
         if id
           logger.debug("queuing snapshot '#{snapshot_id}' for deletion")

@@ -21,7 +21,7 @@ describe Bosh::Aws::MicroBoshBootstrap do
 
     context "when the environment does not provide an override AMI" do
       before do
-        Net::HTTP.should_receive(:get).with("bosh-jenkins-artifacts.s3.amazonaws.com", "/last_successful_micro-bosh-stemcell-aws_ami_us-east-1").and_return("ami-david")
+        Net::HTTP.should_receive(:get).with("bosh-jenkins-artifacts.s3.amazonaws.com", "/last_successful-bosh-stemcell-aws_ami_us-east-1").and_return("ami-david")
       end
 
       it "returns the content from S3" do
@@ -61,12 +61,12 @@ describe Bosh::Aws::MicroBoshBootstrap do
     it "should remove any existing deployment artifacts first" do
       ::Bosh::Cli::Command::Base.any_instance.stub(:non_interactive?).and_return(true)
       FileUtils.mkdir_p("deployments/micro")
-      File.open("deployments/bosh_registry.log", "w") { |f| f.write("old stuff!") }
+      File.open("deployments/bosh-registry.log", "w") { |f| f.write("old stuff!") }
       File.open("deployments/micro/leftover.yml", "w") { |f| f.write("old stuff!") }
-      File.exist?("deployments/bosh_registry.log").should == true
+      File.exist?("deployments/bosh-registry.log").should == true
       File.exist?("deployments/micro/leftover.yml").should == true
       microbosh_bootstrap.start
-      File.exist?("deployments/bosh_registry.log").should == false
+      File.exist?("deployments/bosh-registry.log").should == false
       File.exist?("deployments/micro/leftover.yml").should == false
     end
 

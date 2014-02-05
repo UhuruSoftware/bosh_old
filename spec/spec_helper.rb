@@ -1,3 +1,5 @@
+require File.expand_path('../shared_spec_helper', __FILE__)
+
 require "fileutils"
 require "digest/sha1"
 require "tmpdir"
@@ -7,28 +9,19 @@ require "yaml"
 require "nats/client"
 require "redis"
 require "restclient"
-require "director"
-
+require "bosh/director"
 
 SPEC_ROOT = File.expand_path(File.dirname(__FILE__))
-
-ASSETS_DIR = File.join(SPEC_ROOT, "assets")
-
-Dir.glob("#{SPEC_ROOT}/support/**/*.rb") do |filename|
-  require filename
-end
+Dir.glob("#{SPEC_ROOT}/support/**/*.rb") { |f| require(f) }
 
 SANDBOX_DIR = Dir.mktmpdir
-
-TEST_RELEASE_TEMPLATE = File.join(ASSETS_DIR, "test_release_template")
 TEST_RELEASE_DIR = File.join(SANDBOX_DIR, "test_release")
+BOSH_WORK_DIR    = File.join(SANDBOX_DIR, "bosh_work_dir")
+BOSH_CONFIG      = File.join(SANDBOX_DIR, "bosh_config.yml")
 
-BOSH_CACHE_DIR = File.join(SANDBOX_DIR, "cache")
-
-BOSH_WORK_TEMPLATE  = File.join(ASSETS_DIR, "bosh_work_dir")
-BOSH_WORK_DIR  = File.join(SANDBOX_DIR, "bosh_work_dir")
-
-BOSH_CONFIG    = File.join(SANDBOX_DIR, "bosh_config.yml")
+ASSETS_DIR = File.join(SPEC_ROOT, "assets")
+TEST_RELEASE_TEMPLATE = File.join(ASSETS_DIR, "test_release_template")
+BOSH_WORK_TEMPLATE    = File.join(ASSETS_DIR, "bosh_work_dir")
 
 STDOUT.sync = true
 
@@ -43,7 +36,7 @@ module Bosh
 end
 
 RSpec.configure do |c|
-  c.before(:each) do |example|
+  c.before do |example|
     cleanup_bosh
     setup_test_release_dir
     setup_bosh_work_dir
@@ -62,12 +55,6 @@ def yaml_file(name, object)
   f.close
   f
 end
-
-def director_version
-  version = `(git show-ref --head --hash=8 2> /dev/null || echo 00000000)`
-  "Ver: #{Bosh::Director::VERSION} (#{version.lines.first.strip})"
-end
-
 
 def setup_bosh_work_dir
   FileUtils.cp_r(BOSH_WORK_TEMPLATE, BOSH_WORK_DIR, :preserve => true)
@@ -104,4 +91,3 @@ def cleanup_bosh
   FileUtils.rm_rf(SANDBOX_DIR)
   FileUtils.mkdir_p(SANDBOX_DIR)
 end
-

@@ -6,11 +6,11 @@ describe String do
 
   it "can tell valid bosh identifiers from invalid" do
     %w(ruby ruby-1.8.7 mysql-2.3.5-alpha Apache_2.3).each do |id|
-      id.bosh_valid_id?.should be_true
+      id.bosh_valid_id?.should be(true)
     end
 
     ["ruby 1.8", "ruby-1.8@b29", "#!@", "db/2", "ruby(1.8)"].each do |id|
-      id.bosh_valid_id?.should be_false
+      id.bosh_valid_id?.should be(false)
     end
   end
 
@@ -92,9 +92,9 @@ describe Object do
 
   it "can tell if object is blank" do
     o = Object.new
-    o.stub!(:to_s).and_return("  ")
+    o.stub(:to_s).and_return("  ")
     o.should be_blank
-    o.stub!(:to_s).and_return("Object 1")
+    o.stub(:to_s).and_return("Object 1")
     o.should_not be_blank
   end
 

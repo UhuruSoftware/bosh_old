@@ -1,58 +1,78 @@
-module Bosh
-  module Dev
-    class BatHelper
-      AWS = 'aws'
-      INFRASTRUCTURE = %w[openstack vsphere] << AWS
+require 'bosh/dev/build'
+require 'bosh/stemcell/definition'
+require 'bosh/dev/aws/runner_builder'
+require 'bosh/dev/openstack/runner_builder'
+require 'bosh/dev/vsphere/runner_builder'
+require 'bosh/dev/bat/artifacts'
 
-      attr_reader :workspace_dir
-      attr_reader :infrastructure
+module Bosh::Dev
+  class BatHelper
+    def self.for_rake_args(args)
+      new(
+        runner_builder_for_infrastructure_name(args.infrastructure_name),
+        Bosh::Stemcell::Definition.for(args.infrastructure_name, args.operating_system_name, 'ruby'),
+        Bosh::Stemcell::Definition.for(args.infrastructure_name, args.operating_system_name, args.agent_name),
+        Build.candidate,
+        args.net_type,
+      )
+    end
 
-      def initialize(workspace_dir, infrastructure)
-        raise ArgumentError.new("invalid infrastructure: #{infrastructure}") unless INFRASTRUCTURE.include?(infrastructure)
+    def self.runner_builder_for_infrastructure_name(name)
+      { 'aws'       => Bosh::Dev::Aws::RunnerBuilder.new,
+        'openstack' => Bosh::Dev::Openstack::RunnerBuilder.new,
+        'vsphere'   => Bosh::Dev::VSphere::RunnerBuilder.new,
+      }[name]
+    end
 
-        @workspace_dir = workspace_dir
-        @infrastructure = infrastructure
-        @pipeline = Bosh::Dev::Pipeline.new
+    def initialize(runner_builder, microbosh_definition, bat_definition, build, net_type)
+      @runner_builder   = runner_builder
+      @microbosh_definition = microbosh_definition
+      @bat_definition = bat_definition
+      @build    = build
+      @net_type = net_type
+
+      artifacts_path = File.join(
+        '/tmp/ci-artifacts',
+        bat_definition.infrastructure.name,
+        net_type,
+        bat_definition.operating_system.name,
+        bat_definition.agent.name,
+        'deployments'
+      )
+      @artifacts = Bosh::Dev::Bat::Artifacts.new(artifacts_path, build, microbosh_definition, bat_definition)
+    end
+
+    def deploy_microbosh_and_run_bats
+      artifacts.prepare_directories
+      build.download_stemcell(
+        'bosh-stemcell',
+        bat_definition,
+        bat_definition.infrastructure.light?,
+        artifacts.path,
+      )
+
+      unless bat_definition == microbosh_definition
+        build.download_stemcell(
+          'bosh-stemcell',
+          microbosh_definition,
+          microbosh_definition.infrastructure.light?,
+          artifacts.path,
+        )
       end
 
-      def light?
-        infrastructure == AWS
-      end
+      bats_runner.deploy_microbosh_and_run_bats
+    end
 
-      def bosh_stemcell_path
-        File.join(workspace_dir, @pipeline.latest_stemcell_filename(infrastructure, 'bosh-stemcell', light?))
-      end
+    def run_bats
+      bats_runner.run_bats
+    end
 
-      def micro_bosh_stemcell_path
-        File.join(workspace_dir, @pipeline.latest_stemcell_filename(infrastructure, 'micro-bosh-stemcell', light?))
-      end
+    private
+    attr_reader :build, :net_type, :microbosh_definition, :bat_definition, :artifacts
 
-      def artifacts_dir
-        File.join('/tmp', 'ci-artifacts', infrastructure, 'deployments')
-      end
-
-      def micro_bosh_deployment_dir
-        File.join(artifacts_dir, 'micro_bosh')
-      end
-
-      def run_rake
-        Dir.chdir(workspace_dir) do
-          ENV['BAT_INFRASTRUCTURE'] = infrastructure
-
-          begin
-            @pipeline.download_latest_stemcell(infrastructure: infrastructure, name: 'micro-bosh-stemcell', light: light?)
-            @pipeline.download_latest_stemcell(infrastructure: infrastructure, name: 'bosh-stemcell', light: light?)
-
-            Rake::Task["spec:system:#{infrastructure}:micro"].invoke
-          ensure
-            cleanup_stemcells
-          end
-        end
-      end
-
-      def cleanup_stemcells
-        FileUtils.rm_f(Dir.glob(File.join(workspace_dir, '*bosh-stemcell-*.tgz')))
-      end
+    def bats_runner
+      @runner_builder.build(artifacts, net_type)
     end
   end
 end
+

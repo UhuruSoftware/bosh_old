@@ -9,13 +9,13 @@ describe Bosh::Cli::BlobManager do
   end
 
   before(:each) do
-    @blobstore = mock("blobstore")
+    @blobstore = double("blobstore")
     @dir = Dir.mktmpdir
     @src_dir = FileUtils.mkdir(File.join(@dir, "src"))
     @config_dir = File.join(@dir, "config")
     FileUtils.mkdir(@config_dir)
     @blobs_dir = File.join(@dir, "blobs")
-    @release = mock("release", :dir => @dir, :blobstore => @blobstore)
+    @release = double("release", :dir => @dir, :blobstore => @blobstore)
   end
 
   describe "initialization" do
@@ -27,7 +27,7 @@ describe Bosh::Cli::BlobManager do
     end
 
     it "fails if blobstore is not configured" do
-      @release.stub!(:blobstore).and_return(nil)
+      @release.stub(:blobstore).and_return(nil)
       expect {
         make_manager(@release)
       }.to raise_error("Blobstore is not configured")
@@ -35,13 +35,13 @@ describe Bosh::Cli::BlobManager do
 
     it "creates necessary directories in release dir" do
       make_manager(@release)
-      File.directory?(File.join(@dir, "blobs")).should be_true
-      File.directory?(File.join(@dir, ".blobs")).should be_true
+      File.directory?(File.join(@dir, "blobs")).should be(true)
+      File.directory?(File.join(@dir, ".blobs")).should be(true)
     end
 
     it "has dirty flag cleared and upload list empty" do
       manager = make_manager(@release)
-      manager.dirty?.should be_false
+      manager.dirty?.should be(false)
       manager.blobs_to_upload.should == []
     end
 
@@ -64,7 +64,7 @@ describe Bosh::Cli::BlobManager do
       end
 
       make_manager(@release)
-      File.exists?(legacy_file).should be_false
+      File.exists?(legacy_file).should be(false)
       Psych.load_file(File.join(@config_dir, "blobs.yml")).should == test_hash
     end
   end
@@ -114,14 +114,14 @@ describe Bosh::Cli::BlobManager do
     it "adds blob to a blobs directory" do
       blob_dst = File.join(@blobs_dir, "foo", "blob")
       @manager.add_blob(@blob.path, "foo/blob")
-      File.exists?(blob_dst).should be_true
+      File.exists?(blob_dst).should be(true)
       File.read(blob_dst).should == "blob contents"
-      File.symlink?(blob_dst).should be_false
+      File.symlink?(blob_dst).should be(false)
       File.stat(blob_dst).mode.to_s(8)[-4..-1].should == "0644"
-      File.exists?(@blob.path).should be_true # original still exists
+      File.exists?(@blob.path).should be(true) # original still exists
 
       @manager.process_blobs_directory
-      @manager.dirty?.should be_true
+      @manager.dirty?.should be(true)
       @manager.new_blobs.should == %w(foo/blob)
       @manager.updated_blobs.should == []
     end
@@ -207,7 +207,7 @@ describe Bosh::Cli::BlobManager do
       blob_dst = File.join(@blobs_dir, "foo")
       checksum = Digest::SHA1.hexdigest("test blob")
 
-      File.symlink?(blob_dst).should be_true
+      File.symlink?(blob_dst).should be(true)
       File.readlink(blob_dst).should == File.join(@dir, ".blobs", checksum)
       File.read(blob_dst).should == "test blob"
     end
@@ -224,7 +224,7 @@ describe Bosh::Cli::BlobManager do
 
     it "processes blobs directory" do
       @manager = make_manager(@release)
-      @blobstore.stub!(:create).and_return("new-object-id")
+      @blobstore.stub(:create).and_return("new-object-id")
 
       new_blob = Tempfile.new("new-blob")
       new_blob.write("test")

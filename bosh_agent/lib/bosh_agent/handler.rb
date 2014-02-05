@@ -48,7 +48,6 @@ module Bosh::Agent
       find_message_processors
     end
 
-    # TODO: add runtime loading of message handlers
     def find_message_processors
       message_consts = Bosh::Agent::Message.constants
       @processors = {}
@@ -81,7 +80,6 @@ module Bosh::Agent
         end
 
         setup_heartbeats
-        setup_sshd_monitor
 
         if @process_alerts
           if (@smtp_port.nil? || @smtp_user.nil? || @smtp_password.nil?)
@@ -121,17 +119,6 @@ module Bosh::Agent
         @logger.info("Heartbeats are enabled and will be sent every #{interval} seconds")
       else
         @logger.warn("Heartbeats are disabled")
-      end
-    end
-
-    def setup_sshd_monitor
-      interval = Config.sshd_monitor_interval.to_i
-      if interval > 0
-        Bosh::Agent::SshdMonitor.enable(interval, Config.sshd_start_delay)
-        @logger.info("sshd monitor is enabled, interval of #{interval} and start " +
-                     "delay of #{Config.sshd_start_delay} seconds")
-      else
-        @logger.warn("SSH is disabled")
       end
     end
 
@@ -226,8 +213,6 @@ module Bosh::Agent
       end
     end
 
-    # TODO once we upgrade to nats 0.4.22 we can use
-    # NATS.server_info[:max_payload] instead of NATS_MAX_PAYLOAD_SIZE
     NATS_MAX_PAYLOAD_SIZE = 1024 * 1024
 
     def publish(reply_to, payload, &blk)
@@ -240,15 +225,12 @@ module Bosh::Agent
 
       json = Yajl::Encoder.encode(payload)
 
-      # TODO figure out if we want to try to scale down the message instead
-      # of generating an exception
       if json.bytesize < NATS_MAX_PAYLOAD_SIZE
         EM.next_tick do
           @nats.publish(reply_to, json, &blk)
         end
       else
         msg = "message > NATS_MAX_PAYLOAD, stored in blobstore"
-        # TODO this stores the exception content unencrypted, we should store the encrypted and decrypt on fetch
         exception = RemoteException.new(msg, nil, unencrypted)
         @logger.fatal(msg)
         EM.next_tick do
@@ -338,7 +320,7 @@ module Bosh::Agent
     def lookup_encryption_handler(arg)
       if arg[:session_id]
         message_session_id = arg[:session_id]
-        @sessions[message_session_id] ||= Bosh::EncryptionHandler.new(@agent_id, @credentials)
+        @sessions[message_session_id] ||= Bosh::Core::EncryptionHandler.new(@agent_id, @credentials)
         encryption_handler = @sessions[message_session_id]
         return encryption_handler
       elsif arg[:reply_to]
@@ -366,7 +348,7 @@ module Bosh::Agent
       # Log exceptions from the EncryptionHandler, but stay quiet on the wire.
       begin
         msg = encryption_handler.decrypt(msg["encrypted_data"])
-      rescue Bosh::EncryptionHandler::CryptError => e
+      rescue Bosh::Core::EncryptionHandler::CryptError => e
         log_encryption_error(e)
         return
       end

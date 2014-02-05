@@ -1,44 +1,56 @@
+require 'yajl'
+require 'bosh/dev/sandbox/main'
+
 module IntegrationExampleGroup
-  def start_sandbox
-    puts "Starting sandboxed environment for BOSH tests..."
-    current_sandbox.start
+  def target_and_login
+    run_bosh("target http://localhost:#{current_sandbox.director_port}")
+    run_bosh('login admin admin')
   end
 
-  def stop_sandbox
-    puts "\n  Stopping sandboxed environment for BOSH tests..."
-    current_sandbox.stop
-    cleanup_bosh
+  def deploy_simple(options={})
+    run_bosh("target http://localhost:#{current_sandbox.director_port}")
+    run_bosh('login admin admin')
+
+    run_bosh('create release', work_dir: TEST_RELEASE_DIR)
+    run_bosh('upload release', work_dir: TEST_RELEASE_DIR)
+
+    run_bosh("upload stemcell #{spec_asset('valid_stemcell.tgz')}")
+    deploy_simple_manifest(options)
   end
 
-  def reset_sandbox(example)
-    desc = example ? example.example.metadata[:description] : ""
-    current_sandbox.reset(desc)
+  def deploy_simple_manifest(options={})
+    manifest_hash = options.fetch(:manifest_hash, Bosh::Spec::Deployments.simple_manifest)
+
+    # Hold reference to the tempfile so that it stays around
+    # until the end of tests or next deploy.
+    @deployment_manifest = yaml_file('simple', manifest_hash)
+    run_bosh("deployment #{@deployment_manifest.path}")
+
+    no_track = options.fetch(:no_track, false)
+    output = run_bosh("#{no_track ? '--no-track ' : ''}deploy")
+    expect($?).to be_success
+
+    output
   end
 
-  def run_bosh(cmd, work_dir = nil, options = {})
+  def run_bosh(cmd, options = {})
     failure_expected = options.fetch(:failure_expected, false)
-    Dir.chdir(work_dir || BOSH_WORK_DIR) do
-      command = "bosh -n -c #{BOSH_CONFIG} -C #{BOSH_CACHE_DIR} #{cmd}"
+    work_dir = options.fetch(:work_dir, BOSH_WORK_DIR)
+    Dir.chdir(work_dir) do
+      command = "bosh -n -c #{BOSH_CONFIG} #{cmd}"
       output = `#{command} 2>&1`
       if $?.exitstatus != 0 && !failure_expected
-        puts command
-        puts output
+        if output =~ /bosh (task \d+ --debug)/
+          puts run_bosh($1, options.merge(failure_expected: true)) rescue nil
+        end
+        raise "ERROR: #{command} failed with #{output}"
       end
       output
     end
   end
 
-  def run_bosh_cck_ignore_errors(num_errors)
-    resolution_selections = "1\n"*num_errors + "yes"
-    output = `echo "#{resolution_selections}" | bosh -c #{BOSH_CONFIG} -C #{BOSH_CACHE_DIR} cloudcheck`
-    if $?.exitstatus != 0
-      puts output
-    end
-    output
-  end
-
   def current_sandbox
-    @current_sandbox = Thread.current[:sandbox] || Bosh::Spec::Sandbox.new
+    @current_sandbox = Thread.current[:sandbox] || Bosh::Dev::Sandbox::Main.new
     Thread.current[:sandbox] = @current_sandbox
   end
 
@@ -50,12 +62,14 @@ module IntegrationExampleGroup
     out.gsub(/^\s*/, '').gsub(/\s*$/, '')
   end
 
+  # forcefully suppress raising on error...caller beware
   def expect_output(cmd, expected_output)
-    format_output(run_bosh(cmd)).should == format_output(expected_output)
+    expect(format_output(run_bosh(cmd, :failure_expected => true))).
+      to eq(format_output(expected_output))
   end
 
   def get_vms
-    output = run_bosh("vms --details")
+    output = run_bosh('vms --details')
     table = output.lines.grep(/\|/)
 
     table = table.map { |line| line.split('|').map(&:strip).reject(&:empty?) }
@@ -85,9 +99,11 @@ module IntegrationExampleGroup
   end
 
   def self.included(base)
-    base.before(:each) do |example|
+    base.before do |example|
       unless $sandbox_started
-        start_sandbox
+        puts 'Starting sandboxed environment for BOSH tests...'
+        current_sandbox.start
+
         $sandbox_started = true
         at_exit do
           begin
@@ -96,20 +112,25 @@ module IntegrationExampleGroup
             else
               status = 0
             end
-            stop_sandbox
+            puts "\n  Stopping sandboxed environment for BOSH tests..."
+            current_sandbox.stop
+            cleanup_bosh
           ensure
             exit status
           end
         end
       end
 
-      reset_sandbox(example) unless example.example.metadata[:no_reset]
+      unless example.metadata[:no_reset]
+        desc = example ? example.metadata[:description] : ''
+        current_sandbox.reset(desc)
+        FileUtils.rm_rf(current_sandbox.cloud_storage_dir)
+      end
     end
 
-    base.after(:each) do |example|
-      desc = example ? example.example.metadata[:description] : ""
+    base.after do |example|
+      desc = example ? example.metadata[:description] : ""
       current_sandbox.save_task_logs(desc)
-      FileUtils.rm_rf(current_sandbox.cloud_storage_dir)
     end
   end
 end

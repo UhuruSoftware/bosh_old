@@ -1,112 +1,116 @@
 require 'spec_helper'
 
-describe Bosh::Blobstore::LocalClient do
+module Bosh::Blobstore
+  describe LocalClient do
+    subject { described_class.new(@options) }
 
-  before(:each) do
-    @tmp = Dir.mktmpdir
-    @options = {"blobstore_path" => @tmp}
-  end
+    it_implements_base_client_interface
 
-  after(:each) do
-    FileUtils.rm_rf(@tmp)
-  end
+    before do
+      @tmp = Dir.mktmpdir
+      @options = { 'blobstore_path' => @tmp }
+    end
 
-  it "should require blobstore_path option" do
-    lambda {
-      client = Bosh::Blobstore::LocalClient.new({})
-    }.should raise_error
-  end
+    after { FileUtils.rm_rf(@tmp) }
 
-  it "should create blobstore_path direcory if it doesn't exist'" do
-    dir = File.join(@tmp, "blobstore")
-    client = Bosh::Blobstore::LocalClient.new({"blobstore_path" => dir})
-    File.directory?(dir).should be_true
-  end
+    it 'should require blobstore_path option' do
+      expect { LocalClient.new({}) }.to raise_error
+    end
 
-  describe "operations" do
+    it "should create blobstore_path direcory if it doesn't exist'" do
+      dir = File.join(@tmp, 'blobstore')
 
-    describe '#exists?' do
-      it 'should return true if the object already exists' do
-        File.open(File.join(@tmp, 'foo'), 'w') do |fh|
-          fh.puts("bar")
+      LocalClient.new('blobstore_path' => dir)
+
+      expect(File.directory?(dir)).to be(true)
+    end
+
+    describe 'operations' do
+
+      describe '#exists?' do
+        it 'should return true if the object already exists' do
+          File.open(File.join(@tmp, 'foo'), 'w') do |fh|
+            fh.puts('bar')
+          end
+
+          client = LocalClient.new(@options)
+          expect(client.exists?('foo')).to be(true)
         end
 
-        client = Bosh::Blobstore::LocalClient.new(@options)
-        client.exists?("foo").should be_true
+        it "should return false if the object doesn't exists" do
+          client = LocalClient.new(@options)
+          expect(client.exists?('foo')).to be(false)
+        end
       end
 
-      it "should return false if the object doesn't exists" do
-        client = Bosh::Blobstore::LocalClient.new(@options)
-        client.exists?("foo").should be_false
-      end
-    end
+      describe 'get' do
+        it 'should retrive the correct contents' do
+          File.open(File.join(@tmp, 'foo'), 'w') do |fh|
+            fh.puts('bar')
+          end
 
-    describe "get" do
-      it "should retrive the correct contents" do
-        File.open(File.join(@tmp, 'foo'), 'w') do |fh|
-          fh.puts("bar")
+          client = LocalClient.new(@options)
+          expect(client.get('foo')).to eq("bar\n")
+        end
+      end
+
+      describe 'create' do
+        it 'should store a file' do
+          test_file = asset('file')
+          client = LocalClient.new(@options)
+          fh = File.open(test_file)
+          id = client.create(fh)
+          fh.close
+          original = File.new(test_file).readlines
+
+          stored = File.new(File.join(@tmp, id)).readlines
+          expect(stored).to eq(original)
         end
 
-        client = Bosh::Blobstore::LocalClient.new(@options)
-        client.get("foo").should == "bar\n"
+        it 'should store a string' do
+          client = LocalClient.new(@options)
+          string = 'foobar'
+          id = client.create(string)
+
+          stored = File.new(File.join(@tmp, id)).readlines
+          expect(stored).to eq([string])
+        end
+
+        it 'should accept object id suggestion' do
+          client = LocalClient.new(@options)
+          string = 'foobar'
+
+          id = client.create(string, 'foobar')
+          expect(id).to eq('foobar')
+
+          stored = File.new(File.join(@tmp, id)).readlines
+          expect(stored).to eq([string])
+        end
+
+        it 'should raise an error' do
+          client = LocalClient.new(@options)
+          string = 'foobar'
+          expect(client.create(string, 'foobar')).to eq('foobar')
+
+          expect { client.create(string, 'foobar') }.to raise_error BlobstoreError
+        end
       end
+
+      describe 'delete' do
+        it 'should delete an id' do
+          client = LocalClient.new(@options)
+          string = 'foobar'
+          id = client.create(string)
+          client.delete(id)
+          expect(File.exist?(File.join(@tmp, id))).to be(false)
+        end
+
+        it 'should raise NotFound error when trying to delete a missing id' do
+          expect { LocalClient.new(@options).delete('missing') }.to raise_error NotFound
+        end
+      end
+
     end
-
-    describe "create" do
-      it "should store a file" do
-        test_file = asset('file')
-        client = Bosh::Blobstore::LocalClient.new(@options)
-        fh = File.open(test_file)
-        id = client.create(fh)
-        fh.close
-        original = File.new(test_file).readlines
-        stored = File.new(File.join(@tmp, id)).readlines
-        stored.should == original
-      end
-
-      it "should store a string" do
-        client = Bosh::Blobstore::LocalClient.new(@options)
-        string = "foobar"
-        id = client.create(string)
-        stored = File.new(File.join(@tmp, id)).readlines
-        stored.should == [string]
-      end
-
-      it 'should accept object id suggestion' do
-        client = Bosh::Blobstore::LocalClient.new(@options)
-        string = 'foobar'
-        id = client.create(string, 'foobar')
-        id.should == 'foobar'
-        stored = File.new(File.join(@tmp, id)).readlines
-        stored.should == [string]
-      end
-
-      it 'should raise an error' do
-        client = Bosh::Blobstore::LocalClient.new(@options)
-        string = 'foobar'
-        client.create(string, 'foobar').should == 'foobar'
-        expect {
-          client.create(string, 'foobar')
-        }.to raise_error Bosh::Blobstore::BlobstoreError
-      end
-    end
-
-    describe "delete" do
-      it "should delete an id" do
-        client = Bosh::Blobstore::LocalClient.new(@options)
-        string = "foobar"
-        id = client.create(string)
-        client.delete(id)
-        File.exist?(File.join(@tmp, id)).should_not be_true
-      end
-
-      it "should raise NotFound error when trying to delete a missing id" do
-        client = Bosh::Blobstore::LocalClient.new(@options)
-        lambda {
-          client.delete("missing")
-          }.should raise_error Bosh::Blobstore::NotFound
-      end
-    end
-
   end
 end
+

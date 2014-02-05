@@ -4,7 +4,7 @@ require "spec_helper"
 
 describe Bosh::Cli::JobPropertyValidator do
   before do
-    File.stub(:read).with('/jobs/director/templates/director.yml.erb').and_return('---\nname: <%= p("director.name") %>')
+    File.stub(:read).with('/jobs/director/templates/director.yml.erb.erb').and_return('---\nname: <%= p("director.name") %>')
     File.stub(:read).with('/jobs/blobstore/templates/blobstore.yml.erb').and_return('---\nprovider: <%= p("blobstore.provider") %>')
     File.stub(:read).with('/jobs/blobstore/templates/test.yml.erb').and_return('---\nhost: <%= spec.networks.send("foo").ip %>')
   end
@@ -16,7 +16,7 @@ describe Bosh::Cli::JobPropertyValidator do
                             {'description' => 'Name of director'},
                         'director.port' =>
                             {'description' => 'Port that the director nginx listens on', 'default' => 25555}},
-           all_templates: %w[/jobs/director/templates/director.yml.erb])
+           all_templates: %w[/jobs/director/templates/director.yml.erb.erb])
   end
 
   let(:blobstore_job) do
@@ -68,7 +68,7 @@ describe Bosh::Cli::JobPropertyValidator do
       it 'should have template errors' do
         validator.validate
 
-        expect(validator.template_errors).to have(2).items
+        expect(validator.template_errors.size).to eq(2)
         expect(validator.template_errors.first.exception.to_s).to eq "Can't find property `[\"director.name\"]'"
         expect(validator.template_errors.last.exception.to_s).to eq "Can't find property `[\"blobstore.provider\"]'"
       end
@@ -80,7 +80,7 @@ describe Bosh::Cli::JobPropertyValidator do
       it 'should have template errors' do
         validator.validate
 
-        expect(validator.template_errors).to have(1).items
+        expect(validator.template_errors.size).to eq(1)
         expect(validator.template_errors.first.exception.to_s).to eq "Can't find property `[\"director.name\"]'"
       end
     end
@@ -132,7 +132,7 @@ describe Bosh::Cli::JobPropertyValidator do
     it 'should identify legacy jobs with no properties' do
       validator.validate
 
-      expect(validator.jobs_without_properties).to have(1).items
+      expect(validator.jobs_without_properties.size).to eq(1)
       expect(validator.jobs_without_properties.first.name).to eq 'noprops'
     end
   end

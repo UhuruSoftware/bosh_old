@@ -22,38 +22,38 @@ module Bosh
       #   @param [File] file file to upload
       #   @param [String] id suggested object id, if nil a uuid is generated
       # @return [String] object id of the created blobstore object
-      def create(contents, id=nil)
+      def create(contents, id = nil)
         if contents.kind_of?(File)
           create_file(id, contents)
         else
           temp_path do |path|
-            File.open(path, "w") do |file|
+            File.open(path, 'w') do |file|
               file.write(contents)
             end
-            return create_file(id, File.open(path, "r"))
+            return create_file(id, File.open(path, 'r'))
           end
         end
       rescue BlobstoreError => e
         raise e
       rescue Exception => e
         raise BlobstoreError,
-          "Failed to create object, underlying error: %s %s" %
-          [e.message, e.backtrace.join("\n")]
+              sprintf('Failed to create object, underlying error: %s %s', e.inspect, e.backtrace.join("\n"))
       end
 
       # Get an object from the blobstore.
       # @param [String] id object id
       # @param [File] file where to store the fetched object
+      # @param [Hash] options for individual request configuration
       # @return [String] the object contents if the file parameter is nil
-      def get(id, file = nil)
+      def get(id, file = nil, options = {})
         if file
           get_file(id, file)
           file.flush
         else
           result = nil
           temp_path do |path|
-              File.open(path, "w") { |file| get_file(id, file) }
-              result = File.open(path, "r") { |file| file.read }
+            File.open(path, 'w') { |f| get_file(id, f) }
+            result = File.open(path, 'r') { |f| f.read }
           end
           result
         end
@@ -61,8 +61,7 @@ module Bosh
         raise e
       rescue Exception => e
         raise BlobstoreError,
-              "Failed to create object, underlying error: %s %s" %
-              [e.message, e.backtrace.join("\n")]
+              sprintf('Failed to fetch object, underlying error: %s %s', e.inspect, e.backtrace.join("\n"))
       end
 
       # @return [void]
@@ -73,11 +72,6 @@ module Bosh
       # @return [Boolean]
       def exists?(oid)
         object_exists?(oid)
-      end
-
-      # @return [Array]
-      def list
-        list_objects
       end
 
       protected
@@ -103,17 +97,12 @@ module Bosh
         not_supported
       end
 
-      # Optional; if not supported, blobstore will not be backed up
-      def list_objects
-        not_supported
-      end
-
       def generate_object_id
         SecureRandom.uuid
       end
 
       def temp_path
-        path = File.join(Dir::tmpdir, "temp-path-#{SecureRandom.uuid}")
+        path = File.join(Dir.tmpdir, "temp-path-#{SecureRandom.uuid}")
         begin
           yield path if block_given?
           path
@@ -125,7 +114,7 @@ module Bosh
       private
 
       def not_supported
-        raise NotImplemented, "not supported by this blobstore"
+        raise NotImplemented, 'not supported by this blobstore'
       end
     end
   end

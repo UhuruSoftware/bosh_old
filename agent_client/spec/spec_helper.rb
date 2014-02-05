@@ -1,5 +1,5 @@
-# encoding: UTF-8
-# Copyright (c) 2009-2012 VMware, Inc.
+require File.expand_path('../../../spec/shared_spec_helper', __FILE__)
 
-require 'rspec'
 require 'agent_client'
+
+RSpec.configure { |c| c.raise_errors_for_deprecations! }

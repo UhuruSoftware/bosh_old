@@ -5,7 +5,7 @@ describe Bosh::AwsCloud::StemcellCreator do
   let(:region) { double("region", :name => "us-east-1") }
   let(:stemcell_properties) do
     {
-        "name" => "bosh-stemcell",
+        "name" => "stemcell-name",
         "version" => "0.7.0",
         "infrastructure" => "aws",
         "architecture" =>  "x86_64",
@@ -28,11 +28,11 @@ describe Bosh::AwsCloud::StemcellCreator do
       creator = described_class.new(region, stemcell_properties)
       Bosh::AwsCloud::ResourceWait.stub(:for_snapshot).with(snapshot: snapshot, state: :completed)
       Bosh::AwsCloud::ResourceWait.stub(:for_image).with(image: image, state: :available)
-      region.stub_chain(:images, :create => image)
+      region.stub_chain(:images, :create).and_return(image)
 
       creator.should_receive(:copy_root_image)
       volume.should_receive(:create_snapshot).and_return(snapshot)
-      Bosh::AwsCloud::TagManager.should_receive(:tag).with(image, "Name", "bosh-stemcell 0.7.0")
+      Bosh::AwsCloud::TagManager.should_receive(:tag).with(image, "Name", "stemcell-name 0.7.0")
 
       stemcell = creator.create(volume, ebs_volume, "/path/to/image")
     end
@@ -46,8 +46,8 @@ describe Bosh::AwsCloud::StemcellCreator do
     it "should create a fake stemcell" do
       creator = described_class.new(region, stemcell_properties)
 
-      Bosh::AwsCloud::Stemcell.should_receive(:find).with(region, "ami-xxxxxxxx")
-      stemcell = creator.fake
+      Bosh::AwsCloud::StemcellFinder.should_receive(:find_by_region_and_id).with(region, "ami-xxxxxxxx light")
+      creator.fake
     end
 
     it "should raise an error if there is no ami for the current region" do
@@ -66,9 +66,9 @@ describe Bosh::AwsCloud::StemcellCreator do
       params = described_class.new(region, stemcell_properties).image_params("id")
 
       params[:architecture].should == "x86_64"
-      params[:description].should == "bosh-stemcell 0.7.0"
+      params[:description].should == "stemcell-name 0.7.0"
       params[:kernel_id].should == "aki-xxxxxxxx"
-      params[:description].should == "bosh-stemcell 0.7.0"
+      params[:description].should == "stemcell-name 0.7.0"
       params[:root_device_name].should == "/dev/sda1"
       params[:block_device_mappings].should == {
           "/dev/sda"=>{:snapshot_id=>"id"}, "/dev/sdb"=>"ephemeral0"

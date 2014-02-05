@@ -1,9 +1,7 @@
-# encoding: UTF-8
-
 module Bosh
   module Agent
     class Client
-      VERSION = '1.5.0.pre.3'
+      VERSION = '1.1868.0'
     end
   end
 end

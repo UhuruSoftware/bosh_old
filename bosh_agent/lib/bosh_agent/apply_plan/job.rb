@@ -39,8 +39,12 @@ module Bosh::Agent
         @link_path = File.join(@base_dir, 'jobs', @template)
       end
 
-      def install
+      def prepare_for_install
         fetch_bits
+      end
+
+      def install
+        fetch_bits_and_symlink
         bind_configuration
         harden_permissions
       rescue SystemCallError => e
@@ -138,7 +142,6 @@ module Bosh::Agent
         end
       end
 
-      # TODO: move from util here? (not being used anywhere else)
       def run_post_install_hook
         Bosh::Agent::Util.run_hook("post_install", @template)
       end

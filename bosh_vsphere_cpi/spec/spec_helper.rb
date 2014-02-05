@@ -1,14 +1,12 @@
-# Copyright (c) 2009-2012 VMware, Inc.
+require File.expand_path('../../../spec/shared_spec_helper', __FILE__)
 
-require "rspec"
-
-require "sequel"
-require "sequel/adapters/sqlite"
+require 'sequel'
+require 'sequel/adapters/sqlite'
 
 Sequel.extension :migration
 db = Sequel.sqlite(':memory:')
-migration = File.expand_path("../../db/migrations", __FILE__)
-Sequel::TimestampMigrator.new(db, migration, :table => "vsphere_cpi_schema").run
+migration = File.expand_path('../../db/migrations', __FILE__)
+Sequel::TimestampMigrator.new(db, migration, :table => 'vsphere_cpi_schema').run
 
 require 'cloud'
 require 'cloud/vsphere'
@@ -21,7 +19,7 @@ config = VSphereSpecConfig.new
 config.db = db
 config.logger = Logger.new(STDOUT)
 config.logger.level = Logger::ERROR
-config.uuid = "123"
+config.uuid = '123'
 
 Bosh::Clouds::Config.configure(config)
 VSphereCloud::Config.logger = config.logger

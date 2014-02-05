@@ -68,23 +68,15 @@ describe "messages" do
     command = "nats-server --port #{@port} --user #{@user} --pass #{@pass}"
     @nats_pid = Process.spawn(command)
 
-    agent = File.expand_path("../../../bin/bosh_agent", __FILE__)
-    @basedir = File.expand_path("../../../tmp", __FILE__)
-    FileUtils.mkdir_p(@basedir) unless Dir.exist?(@basedir)
-    command = "ruby #{agent} -n #{@nats_uri} -a #{@agent_id} -h 1"
-    command += " -b #{@basedir} -l ERROR -t #{@smtp_port}"
-    @agent_pid = Process.spawn(command)
+    @agent_sandbox = Bosh::Agent::Spec::AgentSandbox.new(@agent_id, @nats_uri, @smtp_port, 'ERROR')
+    @agent_sandbox.run
     wait_for_nats
   end
 
-
-
   after(:all) do
-    Process.kill(:TERM, @agent_pid)
-    Process.waitpid(@agent_pid)
+    @agent_sandbox.stop
     Process.kill(:TERM, @nats_pid)
     Process.waitpid(@nats_pid)
-    FileUtils.rm_rf(@basedir)
   end
 
   it "should respond to state message" do
@@ -126,16 +118,6 @@ describe "messages" do
     end
   end
 
-  it "should respond to list disk message" do
-    pending "need to fake disks"
-    nats('list_disk', [])
-  end
-
-  it "should respond to fetch logs message" do
-    pending "need blobstore"
-    nats('fetch_logs', ['agent', ['--all']])
-  end
-
   it "should respond to start message" do
     nats('start') do |msg|
       value = get_value(msg)
@@ -145,14 +127,16 @@ describe "messages" do
 
   it "should respond to drain message" do
     task = nil
-    nats("drain", ["shutdown", "bar"])
+    nats("drain", ["shutdown", "bar"]) do |reply|
+      task = get_value(reply)
+    end
 
-    while task.is_a?(Hash) && task["state"] == "running"
+    while task["state"] == "running"
       sleep 0.5
       nats("get_task", [ task["agent_task_id"] ]) do |msg|
         task = msg
-        unless task.is_a?(Hash) && task["state"]
-          task.should == 0
+        unless task.has_key?("state")
+          expect(get_value(task)).to eq 0
           break
         end
       end
@@ -161,30 +145,23 @@ describe "messages" do
 
   it "should respond to stop message" do
     task = nil
-    nats("stop")
+    nats("stop") do |reply|
+      task = get_value(reply)
+    end
 
-    while task.is_a?(Hash) && task["state"] == "running"
+    while task["state"] == "running"
       sleep 0.5
       nats("get_task", [ task["agent_task_id"] ]) do |msg|
         task = msg
-        unless task.is_a?(Hash) && task["state"]
-          task.should == "stopped"
+        unless task.has_key?("state")
+          expect(get_value(task)).to eq "stopped" # stopped is the result of the Stop message not the state of the task
           break
         end
       end
     end
   end
 
-  it "should respond to compile message" do
-    pending "need to mock package to compile"
-    nats('compile_package') do |msg|
-      msg.should have_key('value')
-      value = msg['value']
-      value.should have_key('state')
-    end
-  end
-
-  it "should return an exception for unknow message" do
+  it "should return an exception for unknown message" do
     nats('foobar') do |msg|
       msg.should have_key('exception')
     end

@@ -28,6 +28,8 @@ The registry options are passed to the Openstack CPI by the BOSH director based 
   Timeout (in seconds) for OpenStack resources desired state (by default 300)
 * `stemcell_public_visibility` (optional)
   Set public visibility for stemcells (true or false (default))
+* `connection_options` (optional)
+  Hash containing optional connection parameters to the OpenStack API (`ssl_verify_peer`, `omit_default_port`, ...)
 * `default_key_name` (required)
   default OpenStack ssh key name to assign to created virtual machines
 * `default_security_group` (required)
@@ -113,7 +115,7 @@ This is a sample of how OpenStack specific properties are used in a BOSH deploym
         network: default
         size: 1
         stemcell:
-          name: bosh-stemcell
+          name: bosh-openstack-kvm-ubuntu
           version: latest
         cloud_properties:
           instance_type: m1.small

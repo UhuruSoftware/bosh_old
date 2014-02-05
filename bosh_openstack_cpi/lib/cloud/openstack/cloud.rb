@@ -49,7 +49,8 @@ module Bosh::OpenStackCloud
         :openstack_api_key => @openstack_properties["api_key"],
         :openstack_tenant => @openstack_properties["tenant"],
         :openstack_region => @openstack_properties["region"],
-        :openstack_endpoint_type => @openstack_properties["endpoint_type"]
+        :openstack_endpoint_type => @openstack_properties["endpoint_type"],
+        :connection_options => @openstack_properties['connection_options']
       }
       begin
         @openstack = Fog::Compute.new(openstack_params)
@@ -65,7 +66,8 @@ module Bosh::OpenStackCloud
         :openstack_api_key => @openstack_properties["api_key"],
         :openstack_tenant => @openstack_properties["tenant"],
         :openstack_region => @openstack_properties["region"],
-        :openstack_endpoint_type => @openstack_properties["endpoint_type"]
+        :openstack_endpoint_type => @openstack_properties["endpoint_type"],
+        :connection_options => @openstack_properties['connection_options']
       }
       begin
         @glance = Fog::Image.new(glance_params)
@@ -244,6 +246,9 @@ module Bosh::OpenStackCloud
           wait_resource(server, :active, :state)
         rescue Bosh::Clouds::CloudError => e
           @logger.warn("Failed to create server: #{e.message}")
+
+          with_openstack { server.destroy }
+
           raise Bosh::Clouds::VMCreationFailed.new(true)
         end
 
@@ -469,10 +474,6 @@ module Bosh::OpenStackCloud
         snapshot = @openstack.snapshots.new(snapshot_params)
         with_openstack { snapshot.save(true) }
 
-        # TODO: Current OpenStack Compute API doesn't support adding metadata for a snapshot,
-        # although OpenStack Volume API supports it. When the Compute API implements metada for snapshots, 
-        # we should add metadata for :agent_id, :instance_id, :director_name and :director_uuid.    
-        
         @logger.info("Creating new snapshot `#{snapshot.id}' for volume `#{disk_id}'...")
         wait_resource(snapshot, :available)
 

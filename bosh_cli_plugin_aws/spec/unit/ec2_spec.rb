@@ -1,7 +1,10 @@
 require 'spec_helper'
 
 describe Bosh::Aws::EC2 do
-  let(:ec2) { described_class.new({}) }
+  let(:aws_region) { 'ap-southeast-1' }
+  let(:expected_nat_ami) { Bosh::Aws::EC2::NAT_AMI_ID[aws_region] }
+
+  subject(:ec2) { described_class.new({'region' => aws_region}) }
 
   describe "elastic IPs" do
     describe "allocation" do
@@ -154,7 +157,7 @@ describe Bosh::Aws::EC2 do
              private_ip_address: "10.1.0.1",
              security_groups: ["sg"],
              key_name: "bosh",
-             image_id: "ami-f619c29f",
+             image_id: expected_nat_ami,
              instance_type: "m1.large"
            }
         )
@@ -169,7 +172,7 @@ describe Bosh::Aws::EC2 do
       end
 
       it "should associate an elastic IP to the NAT instance" do
-        elastic_ip = mock('elastic_ip')
+        elastic_ip = double('elastic_ip')
 
         ec2.should_receive(:allocate_elastic_ip).and_return(elastic_ip)
         nat_instance.should_receive(:associate_elastic_ip).with(elastic_ip)
@@ -178,7 +181,7 @@ describe Bosh::Aws::EC2 do
       end
 
       it "should retry to associate the elastic IP if elastic ip not yet allocated" do
-        elastic_ip = mock('elastic_ip')
+        elastic_ip = double('elastic_ip')
 
         ec2.should_receive(:allocate_elastic_ip).and_return(elastic_ip)
 
@@ -220,7 +223,7 @@ describe Bosh::Aws::EC2 do
                   private_ip_address: "10.1.0.1",
                   security_groups: ["sg"],
                   key_name: "bosh",
-                  image_id: "ami-f619c29f",
+                  image_id: expected_nat_ami,
                   instance_type: "m1.small"
               }
           )
@@ -259,19 +262,19 @@ describe Bosh::Aws::EC2 do
 
     describe "#get_running_instance_by_name" do
       it "should get the instance by tagged name" do
-        fake_aws_instance_1 = mock(AWS::EC2::Instance, tags: {"Name" => "foo"}, status: :running)
-        fake_aws_instance_2 = mock(AWS::EC2::Instance, tags: {"Name" => "bar"}, status: :running)
+        fake_aws_instance_1 = double(AWS::EC2::Instance, tags: {"Name" => "foo"}, status: :running)
+        fake_aws_instance_2 = double(AWS::EC2::Instance, tags: {"Name" => "bar"}, status: :running)
 
-        ec2.stub(:aws_ec2).and_return(mock("AWS::EC2", instances: [fake_aws_instance_1, fake_aws_instance_2]))
+        ec2.stub(:aws_ec2).and_return(double("AWS::EC2", instances: [fake_aws_instance_1, fake_aws_instance_2]))
 
         ec2.get_running_instance_by_name("foo").should == fake_aws_instance_1
       end
 
       it "raises an error if more than one running instance has the given name" do
-        fake_aws_instance_1 = mock(AWS::EC2::Instance, tags: {"Name" => "foo"}, status: :running)
-        fake_aws_instance_2 = mock(AWS::EC2::Instance, tags: {"Name" => "foo"}, status: :running)
+        fake_aws_instance_1 = double(AWS::EC2::Instance, tags: {"Name" => "foo"}, status: :running)
+        fake_aws_instance_2 = double(AWS::EC2::Instance, tags: {"Name" => "foo"}, status: :running)
 
-        ec2.stub(:aws_ec2).and_return(mock("AWS::EC2", instances: [fake_aws_instance_1, fake_aws_instance_2]))
+        ec2.stub(:aws_ec2).and_return(double("AWS::EC2", instances: [fake_aws_instance_1, fake_aws_instance_2]))
 
         expect {
           ec2.get_running_instance_by_name("foo")
@@ -424,20 +427,20 @@ describe Bosh::Aws::EC2 do
 
     describe "#security_group_in_use?" do
       it "should return false if no instances use it" do
-        sg = mock("security group", :name => "sg", :instances => [])
+        sg = double("security group", :name => "sg", :instances => [])
         ec2.send(:security_group_in_use?, sg).should == false
       end
 
       it "should return false if no protected instances use it" do
-        instance = mock("instance", :api_termination_disabled? => false)
-        sg = mock("security group", :name => "sg", :instances => [instance])
+        instance = double("instance", :api_termination_disabled? => false)
+        sg = double("security group", :name => "sg", :instances => [instance])
         ec2.send(:security_group_in_use?, sg).should == false
       end
 
       it "should return true if a protected instances use it" do
-        instance = mock("instance", :api_termination_disabled? => false)
-        protected_instance = mock("instance", :api_termination_disabled? => true)
-        sg = mock("security group", :name => "sg", :instances => [instance, protected_instance])
+        instance = double("instance", :api_termination_disabled? => false)
+        protected_instance = double("instance", :api_termination_disabled? => true)
+        sg = double("security group", :name => "sg", :instances => [instance, protected_instance])
         ec2.send(:security_group_in_use?, sg).should == true
       end
     end
@@ -499,7 +502,7 @@ describe Bosh::Aws::EC2 do
       ec2.stub(:aws_ec2).and_return(fake_aws_ec2)
     end
 
-    let(:fake_aws_ec2) { double("aws_ec2", :instances => mock("instances")) }
+    let(:fake_aws_ec2) { double("aws_ec2", :instances => double("instances")) }
     it "should create an instance with the provided options" do
       fake_aws_ec2.instances.should_receive(:create).with({:some => "opts"})
       ec2.create_instance(:some => "opts")
@@ -507,7 +510,7 @@ describe Bosh::Aws::EC2 do
   end
 
   describe "#disable_src_dest_checking" do
-    let(:ec2_client) { mock('client') }
+    let(:ec2_client) { double('client') }
     let(:fake_aws_ec2) { double("aws_ec2", :client => ec2_client) }
 
     it "should invoke the EC2 client to modify instance attributes" do

@@ -4,8 +4,6 @@ module Bosh::Agent
   class Util
     include Bosh::Exec
 
-    # TODO: convert to module?
-    # TODO: don't use MessageHandlerError here?
     class << self
       def base_dir
         Bosh::Agent::Config.base_dir
@@ -18,37 +16,37 @@ module Bosh::Agent
       def unpack_blob(blobstore_id, sha1, install_path)
         bsc_options = Bosh::Agent::Config.blobstore_options
         bsc_provider = Bosh::Agent::Config.blobstore_provider
-        blobstore_client = Bosh::Blobstore::Client.create(bsc_provider, bsc_options)
+        blobstore_client = Bosh::Blobstore::Client.safe_create(bsc_provider, bsc_options)
 
         data_tmp = File.join(base_dir, 'data', 'tmp')
         FileUtils.mkdir_p(data_tmp)
 
         begin
           tf = Tempfile.open(blobstore_id, data_tmp)
-          logger.info("Retrieving blob: #{blobstore_id}")
 
-          blobstore_client.get(blobstore_id, tf)
-          logger.info("Done retrieving blob")
-
-          tf.flush
-          blob_data_file = tf.path
-
-          logger.info("creating #{install_path}")
-          FileUtils.mkdir_p(install_path)
-
-          blob_sha1 = Digest::SHA1.file(blob_data_file).hexdigest
-          logger.info("hexdigest of #{blob_data_file}")
-
-          unless blob_sha1 == sha1
-            raise Bosh::Agent::MessageHandlerError, "Expected sha1: #{sha1}, Downloaded sha1: #{blob_sha1}"
+          begin
+            logger.info("Retrieving blob '#{blobstore_id}'")
+            blobstore_client.get(blobstore_id, tf, sha1: sha1)
+          rescue Bosh::Blobstore::BlobstoreError => e
+            raise Bosh::Agent::MessageHandlerError.new(e.inspect)
           end
 
-          logger.info("Installing to: #{install_path}")
-          Dir.chdir(install_path) do
-            output = `tar --no-same-owner -zxvf #{blob_data_file}`
-            raise Bosh::Agent::MessageHandlerError.new(
-              "Failed to unpack blob", output) unless $?.exitstatus == 0
+          partial_install_path = "#{install_path}-bosh-agent-unpack"
+          logger.info("Creating '#{partial_install_path}'")
+          FileUtils.rm_rf(partial_install_path)
+          FileUtils.mkdir_p(partial_install_path)
+
+          logger.info("Installing to '#{partial_install_path}'")
+          Dir.chdir(partial_install_path) do
+            output = `tar --no-same-owner -zxvf #{tf.path} 2>&1`
+            unless $?.exitstatus == 0
+              raise Bosh::Agent::MessageHandlerError.new('Failed to unpack blob', output)
+            end
           end
+
+          # Only move contents of the blob to install path at the end
+          # to avoid corrupted package directory
+          FileUtils.mv(partial_install_path, install_path)
         rescue Exception => e
           logger.info("Failure unpacking blob: #{e.inspect} #{e.backtrace}")
           raise e
@@ -58,7 +56,6 @@ module Bosh::Agent
             tf.unlink
           end
         end
-
       end
 
       # @param [Hash] Instance spec
@@ -182,9 +179,6 @@ module Bosh::Agent
         properties = {}
         properties["ip"] = ifconfig.address
         properties["netmask"] = ifconfig.netmask
-        properties["dns"] = []
-        properties["dns"] << net_info.primary_dns if net_info.primary_dns && !net_info.primary_dns.empty?
-        properties["dns"] << net_info.secondary_dns if net_info.secondary_dns && !net_info.secondary_dns.empty?
         properties["gateway"] = net_info.default_gateway
         properties
       end

@@ -10,12 +10,11 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage cloudcheck' do
     end
 
     before do
-      run_bosh("target http://localhost:#{current_sandbox.director_port}")
-      run_bosh('login admin admin')
+      target_and_login
 
-      run_bosh('reset release', TEST_RELEASE_DIR)
-      run_bosh('create release --force', TEST_RELEASE_DIR)
-      run_bosh('upload release', TEST_RELEASE_DIR)
+      run_bosh('reset release', work_dir: TEST_RELEASE_DIR)
+      run_bosh('create release --force', work_dir: TEST_RELEASE_DIR)
+      run_bosh('upload release', work_dir: TEST_RELEASE_DIR)
 
       run_bosh("upload stemcell #{spec_asset('valid_stemcell.tgz')}")
 
@@ -24,7 +23,7 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage cloudcheck' do
 
       run_bosh('deploy')
 
-      run_bosh('cloudcheck --report').should =~ regexp('No problems found')
+      expect(run_bosh('cloudcheck --report')).to match(regexp('No problems found'))
     end
 
     def get_cids
@@ -43,12 +42,12 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage cloudcheck' do
       end
 
       cloudcheck_response = run_bosh_cck_ignore_errors(3)
-      cloudcheck_response.should_not =~ regexp('No problems found')
-      cloudcheck_response.should =~ regexp('3 unresponsive')
-      cloudcheck_response.should =~ regexp('1. Ignore problem
+      expect(cloudcheck_response).to_not match(regexp('No problems found'))
+      expect(cloudcheck_response).to match(regexp('3 unresponsive'))
+      expect(cloudcheck_response).to match(regexp('1. Ignore problem
   2. Reboot VM
   3. Recreate VM using last known apply spec
-  4. Delete VM reference (DANGEROUS!)')
+  4. Delete VM reference (DANGEROUS!)'))
     end
 
     it 'provides resolution options for missing VMs' do
@@ -56,12 +55,21 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage cloudcheck' do
 
       dummy_cloud.delete_vm(cid)
 
-      cloudcheck_response = run_bosh_cck_ignore_errors(1)
-      cloudcheck_response.should_not =~ regexp('No problems found')
-      cloudcheck_response.should =~ regexp('1 missing')
-      cloudcheck_response.should =~ regexp('1. Ignore problem
+     cloudcheck_response = run_bosh_cck_ignore_errors(1)
+     expect(cloudcheck_response).to_not match(regexp('No problems found'))
+     expect(cloudcheck_response).to match(regexp('1 missing'))
+     expect(cloudcheck_response).to match(regexp('1. Ignore problem
   2. Recreate VM using last known apply spec
-  3. Delete VM reference (DANGEROUS!)')
+  3. Delete VM reference (DANGEROUS!)') )
+    end
+
+    def run_bosh_cck_ignore_errors(num_errors)
+      resolution_selections = "1\n"*num_errors + "yes"
+      output = `echo "#{resolution_selections}" | bosh -c #{BOSH_CONFIG} cloudcheck`
+      if $?.exitstatus != 0
+        puts output
+      end
+      output
     end
   end
 end

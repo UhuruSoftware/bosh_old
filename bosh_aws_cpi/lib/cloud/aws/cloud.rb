@@ -1,4 +1,5 @@
 # Copyright (c) 2009-2012 VMware, Inc.
+require 'cloud/aws/stemcell_finder'
 
 module Bosh::AwsCloud
 
@@ -80,12 +81,12 @@ module Bosh::AwsCloud
     def create_vm(agent_id, stemcell_id, resource_pool, network_spec, disk_locality = nil, environment = nil)
       with_thread_name("create_vm(#{agent_id}, ...)") do
         # do this early to fail fast
-        stemcell = Stemcell.find(region, stemcell_id)
+        stemcell = StemcellFinder.find_by_region_and_id(region, stemcell_id)
 
         begin
           instance_manager = InstanceManager.new(region, registry, az_selector)
           instance = instance_manager.
-              create(agent_id, stemcell_id, resource_pool, network_spec, (disk_locality || []), environment, options)
+              create(agent_id, stemcell.image_id, resource_pool, network_spec, (disk_locality || []), environment, options)
 
           logger.info("Creating new instance '#{instance.id}'")
 
@@ -313,9 +314,9 @@ module Bosh::AwsCloud
         instance = @ec2.instances[instance_id]
 
         network_configurator = NetworkConfigurator.new(network_spec)
-        
+
         compare_security_groups(instance, network_spec)
-        
+
         compare_private_ip_addresses(instance, network_configurator.private_ip)
 
         network_configurator.configure(@ec2, instance)
@@ -351,7 +352,7 @@ module Bosh::AwsCloud
     # @param [AWS::EC2::Instance] instance EC2 instance
     # @param [String] specified_ip_address IP address specified at the network spec (if Manual Network)
     # @return [void]
-    # @raise [Bosh::Clouds:NotSupported] If the IP address change, we need to recreate the VM as you can't 
+    # @raise [Bosh::Clouds:NotSupported] If the IP address change, we need to recreate the VM as you can't
     # change the IP address of a running server, so we need to send the InstanceUpdater a request to do it for us
     def compare_private_ip_addresses(instance, specified_ip_address)
       actual_ip_address = instance.private_ip_address
@@ -380,7 +381,6 @@ module Bosh::AwsCloud
     #   root disk size
     # @return [String] EC2 AMI name of the stemcell
     def create_stemcell(image_path, stemcell_properties)
-      # TODO: refactor into several smaller methods
       with_thread_name("create_stemcell(#{image_path}...)") do
         creator = StemcellCreator.new(region, stemcell_properties)
 
@@ -418,7 +418,7 @@ module Bosh::AwsCloud
     # @param [String] stemcell_id EC2 AMI name of the stemcell to be deleted
     def delete_stemcell(stemcell_id)
       with_thread_name("delete_stemcell(#{stemcell_id})") do
-        stemcell = Stemcell.find(region, stemcell_id)
+        stemcell = StemcellFinder.find_by_region_and_id(region, stemcell_id)
         stemcell.delete
       end
     end
@@ -431,7 +431,6 @@ module Bosh::AwsCloud
     def set_vm_metadata(vm, metadata)
       instance = @ec2.instances[vm]
 
-      # TODO should we clear existing tags that don't exist in metadata?
       metadata.each_pair do |key, value|
         TagManager.tag(instance, key, value)
       end
@@ -493,7 +492,7 @@ module Bosh::AwsCloud
     end
 
     def initialize_aws
-      aws_logger = logger # TODO make configurable
+      aws_logger = logger
       aws_params = {
           access_key_id:     aws_properties['access_key_id'],
           secret_access_key: aws_properties['secret_access_key'],

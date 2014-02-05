@@ -7,10 +7,9 @@ describe Bosh::Cli::Command::Base do
   before :each do
     tmpdir = Dir.mktmpdir
     @config = File.join(tmpdir, 'bosh_config')
-    @cache = File.join(tmpdir, 'bosh_cache')
-    @director = mock(Bosh::Cli::Director)
-    Bosh::Cli::Director.stub!(:new).and_return(@director)
-    @director.stub!(:get_status).and_return('name' => 'ZB')
+    @director = double(Bosh::Cli::Client::Director)
+    Bosh::Cli::Client::Director.stub(:new).and_return(@director)
+    @director.stub(:get_status).and_return('name' => 'ZB')
   end
 
   describe Bosh::Cli::Command::Misc do
@@ -18,7 +17,6 @@ describe Bosh::Cli::Command::Base do
     before :each do
       @cmd = Bosh::Cli::Command::Misc.new
       @cmd.add_option(:config, @config)
-      @cmd.add_option(:cache_dir, @cache)
       @cmd.add_option(:non_interactive, true)
     end
 
@@ -68,7 +66,7 @@ describe Bosh::Cli::Command::Base do
       @director.should_receive(:password=).with('pass')
       @cmd.set_target('test')
       @cmd.login('user', 'pass')
-      @cmd.logged_in?.should be_true
+      @cmd.logged_in?.should be(true)
       @cmd.username.should == 'user'
       @cmd.password.should == 'pass'
     end
@@ -79,7 +77,7 @@ describe Bosh::Cli::Command::Base do
       @director.should_receive(:password=).with('pass')
       @cmd.set_target('test')
       @cmd.login(HighLine::String.new('user'), HighLine::String.new('pass'))
-      @cmd.logged_in?.should be_true
+      @cmd.logged_in?.should be(true)
       @cmd.username.should == 'user'
       @cmd.password.should == 'pass'
       config_file = File.read(File.expand_path(@config))
@@ -95,11 +93,11 @@ describe Bosh::Cli::Command::Base do
       @director.should_receive(:password=).with('pass')
       @cmd.login('user', 'pass')
       @cmd.logout
-      @cmd.logged_in?.should be_false
+      @cmd.logged_in?.should be(false)
     end
 
     it 'respects director checks option when logging in' do
-      @director.stub!(:get_status).
+      @director.stub(:get_status).
           and_return({'user' => 'user', 'name' => 'ZB'})
       @director.stub(:authenticated?).and_return(true)
 
@@ -107,7 +105,7 @@ describe Bosh::Cli::Command::Base do
       @director.should_receive(:user=).with('user')
       @director.should_receive(:password=).with('pass')
       @cmd.login('user', 'pass')
-      @cmd.logged_in?.should be_true
+      @cmd.logged_in?.should be(true)
       @cmd.username.should == 'user'
       @cmd.password.should == 'pass'
     end
@@ -115,7 +113,7 @@ describe Bosh::Cli::Command::Base do
 
   describe Bosh::Cli::Command::Stemcell do
     before :each do
-      @director = mock(Bosh::Cli::Director)
+      @director = double(Bosh::Cli::Client::Director)
       @director.stub(:list_stemcells).
           and_return([{'name' => 'foo', 'version' => '123'}])
       @director.should_receive(:list_stemcells)
@@ -123,10 +121,10 @@ describe Bosh::Cli::Command::Base do
       @cmd = Bosh::Cli::Command::Stemcell.new
       @cmd.add_option(:non_interactive, true)
 
-      @cmd.stub!(:target).and_return('test')
-      @cmd.stub!(:username).and_return('user')
-      @cmd.stub!(:password).and_return('pass')
-      @cmd.stub!(:director).and_return(@director)
+      @cmd.stub(:target).and_return('test')
+      @cmd.stub(:username).and_return('user')
+      @cmd.stub(:password).and_return('pass')
+      @cmd.stub(:director).and_return(@director)
     end
 
     it 'allows deleting the stemcell' do
@@ -144,7 +142,7 @@ describe Bosh::Cli::Command::Base do
       @cmd.remove_option(:non_interactive)
       @director.should_not_receive(:delete_stemcell)
 
-      @cmd.stub!(:ask).and_return('')
+      @cmd.stub(:ask).and_return('')
       @cmd.delete('foo', '123')
     end
 
@@ -161,15 +159,15 @@ describe Bosh::Cli::Command::Base do
 
   describe Bosh::Cli::Command::Release do
     before :each do
-      @director = mock(Bosh::Cli::Director)
+      @director = double(Bosh::Cli::Client::Director)
 
       @cmd = Bosh::Cli::Command::Release.new
       @cmd.add_option(:non_interactive, true)
 
-      @cmd.stub!(:target).and_return('test')
-      @cmd.stub!(:username).and_return('user')
-      @cmd.stub!(:password).and_return('pass')
-      @cmd.stub!(:director).and_return(@director)
+      @cmd.stub(:target).and_return('test')
+      @cmd.stub(:username).and_return('user')
+      @cmd.stub(:password).and_return('pass')
+      @cmd.stub(:director).and_return(@director)
     end
 
     it 'allows deleting the release (non-force)' do
@@ -206,7 +204,7 @@ describe Bosh::Cli::Command::Base do
       @director.should_not_receive(:delete_release)
       @cmd.remove_option(:non_interactive)
 
-      @cmd.stub!(:ask).and_return('')
+      @cmd.stub(:ask).and_return('')
       @cmd.delete('foo')
     end
 
@@ -315,12 +313,12 @@ describe Bosh::Cli::Command::Base do
       @cmd = Bosh::Cli::Command::BlobManagement.new
       @cmd.add_option(:non_interactive, true)
 
-      @blob_manager = mock('blob manager')
-      @release = mock('release')
+      @blob_manager = double('blob manager')
+      @release = double('release')
 
       @cmd.should_receive(:check_if_release_dir)
-      Bosh::Cli::Release.stub!(:new).and_return(@release)
-      Bosh::Cli::BlobManager.stub!(:new).with(@release).
+      Bosh::Cli::Release.stub(:new).and_return(@release)
+      Bosh::Cli::BlobManager.stub(:new).with(@release).
           and_return(@blob_manager)
     end
 
@@ -341,7 +339,7 @@ describe Bosh::Cli::Command::Base do
 
     it 'uploads blobs' do
       @blob_manager.should_receive(:print_status)
-      @blob_manager.stub!(:blobs_to_upload).and_return(%w(foo bar baz))
+      @blob_manager.stub(:blobs_to_upload).and_return(%w(foo bar baz))
       @blob_manager.should_receive(:upload_blob).with('foo')
       @blob_manager.should_receive(:upload_blob).with('bar')
       @blob_manager.should_receive(:upload_blob).with('baz')

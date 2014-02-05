@@ -1,3 +1,5 @@
+require 'ruby_vim_sdk'
+
 module VSphereCloud
 
   class Client
@@ -56,7 +58,6 @@ module VSphereCloud
 
       filter_spec = PC::FilterSpec.new(:prop_set => property_specs, :object_set => object_spec)
 
-      # TODO: cache partial results
       attempts = 0
       begin
         properties_response = get_all_properties(filter_spec)
@@ -154,8 +155,11 @@ module VSphereCloud
     def power_on_vm(datacenter, vm)
       task = datacenter.power_on_vm([vm], nil)
       result = wait_for_task(task)
-      if result.attempted.nil?
-        raise "Could not power on VM: #{result.not_attempted.msg}"
+
+      raise "Recommendations were detected, you may be running in Manual DRS mode. Aborting." if result.recommendations.any?
+
+      if result.attempted.empty?
+        raise "Could not power on VM: #{result.not_attempted.map(&:msg).join(', ')}"
       else
         task = result.attempted.first.task
         wait_for_task(task)
@@ -201,9 +205,8 @@ module VSphereCloud
     end
 
     def find_by_inventory_path(path)
-      path = [path] unless path.kind_of?(Array)
-      path = path.flatten.collect { |name| name.gsub("/", "%2f") }.join("/")
-      @service_content.search_index.find_by_inventory_path(path)
+      full_path = Array(path).join("/")
+      @service_content.search_index.find_by_inventory_path(full_path)
     end
 
     def wait_for_task(task)
@@ -214,7 +217,6 @@ module VSphereCloud
                                     :ensure => ["info.state"])[task]
 
         duration = Time.now - started
-        # TODO: make configurable?
         raise "Task taking too long" if duration > 3600 # 1 hour
 
         # Update the polling interval based on task progress

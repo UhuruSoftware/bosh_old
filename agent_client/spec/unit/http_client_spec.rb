@@ -1,25 +1,24 @@
-# encoding: UTF-8
 require 'spec_helper'
 
 describe Bosh::Agent::HTTPClient do
   before(:each) do
-    @httpclient = mock('httpclient')
-    @httpclient.stub(:ssl_config).and_return(mock('sslconfig').as_null_object)
-    HTTPClient.stub!(:new).and_return(@httpclient)
+    @httpclient = double('httpclient')
+    allow(@httpclient).to receive(:ssl_config).and_return(double('sslconfig').as_null_object)
+    allow(HTTPClient).to receive(:new).and_return(@httpclient)
   end
 
   describe 'options' do
     it 'should set up authentication when present' do
-      response = mock('response')
-      response.stub!(:code).and_return(200)
-      response.stub!(:body).and_return('{"value": "pong"}')
+      response = double('response')
+      allow(response).to receive(:code).and_return(200)
+      allow(response).to receive(:body).and_return('{"value": "pong"}')
 
       [:send_timeout=, :receive_timeout=, :connect_timeout=].each do |method|
-        @httpclient.should_receive(method)
+        expect(@httpclient).to receive(method)
       end
 
-      @httpclient.should_receive(:set_auth).with('https://localhost', 'john', 'smith')
-      @httpclient.should_receive(:request).and_return(response)
+      expect(@httpclient).to receive(:set_auth).with('https://localhost', 'john', 'smith')
+      expect(@httpclient).to receive(:request).and_return(response)
 
       @client = Bosh::Agent::HTTPClient.new('https://localhost',
                                             'user' => 'john',
@@ -28,18 +27,18 @@ describe Bosh::Agent::HTTPClient do
     end
 
     it 'should encode arguments' do
-      response = mock('response')
-      response.stub!(:code).and_return(200)
-      response.stub!(:body).and_return('{"value": "iam"}')
+      response = double('response')
+      allow(response).to receive(:code).and_return(200)
+      allow(response).to receive(:body).and_return('{"value": "iam"}')
 
       [:send_timeout=, :receive_timeout=, :connect_timeout=].each do |method|
-        @httpclient.should_receive(method)
+        expect(@httpclient).to receive(method)
       end
 
       headers = { 'Content-Type' => 'application/json' }
       payload = '{"method":"shh","arguments":["hunting","wabbits"],"reply_to":"elmer"}'
 
-      @httpclient.should_receive(:request).with(:post, 'https://localhost/agent',
+      expect(@httpclient).to receive(:request).with(:post, 'https://localhost/agent',
                                                 body: payload, header: headers).and_return(response)
 
       @client = Bosh::Agent::HTTPClient.new('https://localhost', { 'reply_to' => 'elmer' })
@@ -48,18 +47,18 @@ describe Bosh::Agent::HTTPClient do
     end
 
     it 'should receive a message value' do
-      response = mock('response')
-      response.stub!(:code).and_return(200)
-      response.stub!(:body).and_return('{"value": "pong"}')
+      response = double('response')
+      allow(response).to receive(:code).and_return(200)
+      allow(response).to receive(:body).and_return('{"value": "pong"}')
 
       [:send_timeout=, :receive_timeout=, :connect_timeout=].each do |method|
-        @httpclient.should_receive(method)
+        expect(@httpclient).to receive(method)
       end
 
       headers = { 'Content-Type' => 'application/json' }
       payload = '{"method":"ping","arguments":[],"reply_to":"fudd"}'
 
-      @httpclient.should_receive(:request).with(:post, 'https://localhost/agent',
+      expect(@httpclient).to receive(:request).with(:post, 'https://localhost/agent',
                                                 body: payload, header: headers).and_return(response)
 
       @client = Bosh::Agent::HTTPClient.new('https://localhost', { 'reply_to' => 'fudd' })
@@ -68,31 +67,31 @@ describe Bosh::Agent::HTTPClient do
     end
 
     it 'should run_task' do
-      response = mock('response')
-      response.stub!(:code).and_return(200)
-      response.stub!(:body).and_return('{"value": {"state": "running", "agent_task_id": "task_id_foo"}}')
+      response = double('response')
+      allow(response).to receive(:code).and_return(200)
+      allow(response).to receive(:body).and_return('{"value": {"state": "running", "agent_task_id": "task_id_foo"}}')
 
       [:send_timeout=, :receive_timeout=, :connect_timeout=].each do |method|
-        @httpclient.should_receive(method)
+        expect(@httpclient).to receive(method)
       end
 
       headers = { 'Content-Type' => 'application/json' }
       payload = '{"method":"compile_package","arguments":["id","sha1"],"reply_to":"bugs"}'
 
-      @httpclient.should_receive(:request).with(:post, 'https://localhost/agent',
+      expect(@httpclient).to receive(:request).with(:post, 'https://localhost/agent',
                                                 body: payload, header: headers).and_return(response)
 
-      response2 = mock('response2')
-      response2.stub!(:code).and_return(200)
-      response2.stub!(:body).and_return('{"value": {"state": "done"}')
+      response2 = double('response2')
+      allow(response2).to receive(:code).and_return(200)
+      allow(response2).to receive(:body).and_return('{"value": {"state": "done"}')
 
       payload = '{"method":"get_task","arguments":["task_id_foo"],"reply_to":"bugs"}'
 
       [:send_timeout=, :receive_timeout=, :connect_timeout=].each do |method|
-        @httpclient.should_receive(method)
+        expect(@httpclient).to receive(method)
       end
 
-      @httpclient.should_receive(:request).with(:post, 'https://localhost/agent',
+      expect(@httpclient).to receive(:request).with(:post, 'https://localhost/agent',
                                                 body: payload, header: headers).and_return(response2)
 
       @client = Bosh::Agent::HTTPClient.new('https://localhost', { 'reply_to' => 'bugs' })
@@ -101,15 +100,15 @@ describe Bosh::Agent::HTTPClient do
     end
 
     it 'should raise handler exception when method is invalid' do
-      response = mock('response')
-      response.stub!(:code).and_return(200)
-      response.stub!(:body).and_return('{"exception": "no such method"}')
+      response = double('response')
+      allow(response).to receive(:code).and_return(200)
+      allow(response).to receive(:body).and_return('{"exception": "no such method"}')
 
       [:send_timeout=, :receive_timeout=, :connect_timeout=].each do |method|
-        @httpclient.should_receive(method)
+       expect(@httpclient).to receive(method)
       end
 
-      @httpclient.should_receive(:request).and_return(response)
+      expect(@httpclient).to receive(:request).and_return(response)
 
       @client = Bosh::Agent::HTTPClient.new('https://localhost')
 
@@ -118,14 +117,14 @@ describe Bosh::Agent::HTTPClient do
     end
 
     it 'should raise authentication exception when 401 is returned' do
-      response = mock('response')
-      response.stub!(:code).and_return(401)
+      response = double('response')
+      allow(response).to receive(:code).and_return(401)
 
       [:send_timeout=, :receive_timeout=, :connect_timeout=].each do |method|
-        @httpclient.should_receive(method)
+        expect(@httpclient).to receive(method)
       end
 
-      @httpclient.should_receive(:request).and_return(response)
+      expect(@httpclient).to receive(:request).and_return(response)
 
       @client = Bosh::Agent::HTTPClient.new('https://localhost')
 
@@ -142,9 +141,9 @@ describe Bosh::Agent::HTTPClient do
         )
 
         [:send_timeout=, :receive_timeout=, :connect_timeout=, :set_auth].each do |method|
-          @httpclient.stub(method)
+          allow(@httpclient).to receive(method)
         end
-        @httpclient.stub(:request).and_raise(ZeroDivisionError, '3.14')
+        allow(@httpclient).to receive(:request).and_raise(ZeroDivisionError, '3.14')
 
         expect { @client.foo('argz') }.to raise_error(
                                               Bosh::Agent::Error,

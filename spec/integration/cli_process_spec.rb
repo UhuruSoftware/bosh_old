@@ -9,9 +9,8 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage deployment process' do
       deployment_manifest = yaml_file(
         'minimal', Bosh::Spec::Deployments.minimal_manifest)
 
-      run_bosh("target http://localhost:#{current_sandbox.director_port}")
+      target_and_login
       run_bosh("deployment #{deployment_manifest.path}")
-      run_bosh('login admin admin')
       run_bosh("upload release #{release_filename}")
 
       out = run_bosh('deploy')
@@ -24,9 +23,8 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage deployment process' do
       minimal_manifest = Bosh::Spec::Deployments.minimal_manifest
       deployment_manifest = yaml_file(
           'minimal', minimal_manifest)
-      run_bosh("target http://localhost:#{current_sandbox.director_port}")
+      target_and_login
       run_bosh("deployment #{deployment_manifest.path}")
-      run_bosh('login admin admin')
       run_bosh("upload release #{release_filename}")
       filename = File.basename(deployment_manifest.path)
 
@@ -61,18 +59,17 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage deployment process' do
 
       Dir.chdir(TEST_RELEASE_DIR) do
         FileUtils.rm_rf('dev_releases')
-        run_bosh('create release --with-tarball', Dir.pwd)
+        run_bosh('create release --with-tarball', work_dir: Dir.pwd)
       end
 
       deployment_manifest = yaml_file(
         'simple', Bosh::Spec::Deployments.simple_manifest)
 
-      expect(File.exists?(release_filename)).to be_true
-      expect(File.exists?(deployment_manifest.path)).to be_true
+      expect(File.exists?(release_filename)).to be(true)
+      expect(File.exists?(deployment_manifest.path)).to be(true)
 
-      run_bosh("target http://localhost:#{current_sandbox.director_port}")
+      target_and_login
       run_bosh("deployment #{deployment_manifest.path}")
-      run_bosh('login admin admin')
       run_bosh("upload stemcell #{stemcell_filename}")
       run_bosh("upload release #{release_filename}")
 
@@ -82,7 +79,6 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage deployment process' do
 
       expect(run_bosh('cloudcheck --report')).to match /No problems found/
       expect($?).to eq 0
-      # TODO: figure out which artifacts should be created by the given manifest
     end
 
     it 'can delete deployment' do
@@ -90,16 +86,12 @@ describe 'Bosh::Spec::IntegrationTest::CliUsage deployment process' do
       deployment_manifest = yaml_file(
         'minimal', Bosh::Spec::Deployments.minimal_manifest)
 
-      run_bosh("target http://localhost:#{current_sandbox.director_port}")
+      target_and_login
       run_bosh("deployment #{deployment_manifest.path}")
-      run_bosh('login admin admin')
       run_bosh("upload release #{release_filename}")
 
       run_bosh('deploy')
       expect(run_bosh('delete deployment minimal')).to match /Deleted deployment `minimal'/
-      # TODO: test that we don't have artifacts,
-      # possibly upgrade to more featured deployment,
-      # possibly merge to the previous spec
     end
   end
 end

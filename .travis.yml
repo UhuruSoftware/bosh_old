@@ -1,11 +1,19 @@
-script: 'bundle exec rake $TASKS'
-bundler_args: "--local --without development"
+script: 'bundle exec rake --trace $TASKS'
+
+# this is required by the go agent
+before_install: 'sudo apt-get update'
+install:
+  - 'sudo apt-get install dnsutils'
+  - 'bundle install --local --without development'
+
 rvm:
   - ruby-1.9.3
   - ruby-2.0.0
 env:
-  - TASKS="rubocop spec:parallel_unit"
-  - TASKS="spec:integration"
+  - TASKS="ci:run:unit"
+  - TASKS="ci:run:integration"
+  - TASKS="ci:run:go_agent_tests"
 matrix:
   allow_failures:
     - rvm: ruby-2.0.0
+    - env: TASKS="ci:run:go_agent_tests"

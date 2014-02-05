@@ -37,7 +37,7 @@ describe Bosh::Agent::Infrastructure::Aws::Settings do
 
     properties.should have_key("ip")
     properties.should have_key("netmask")
-    properties.should have_key("dns")
+    properties.should_not have_key("dns")
     properties.should have_key("gateway")
   end
 
@@ -63,7 +63,7 @@ describe Bosh::Agent::Infrastructure::Aws::Settings do
   end
 
   it 'should setup the ssh public key' do
-    Bosh::Agent::Infrastructure::Aws::Registry.stub!(:get_openssh_key).and_return("test_key")
+    Bosh::Agent::Infrastructure::Aws::Registry.stub(:get_openssh_key).and_return("test_key")
     settings_wrapper = Bosh::Agent::Infrastructure::Aws::Settings.new
     settings_wrapper.stub(:authorized_keys).and_return(@test_authorized_keys)
     FileUtils.stub(:chown).and_return(true)

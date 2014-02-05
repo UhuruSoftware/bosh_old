@@ -45,7 +45,7 @@ describe Bosh::Agent::Message::FetchLogs do
   def test_tarball(blobstore_id)
     blobstore_id.should_not be_nil
     tarball = File.join(@blobstore_dir, blobstore_id)
-    File.exists?(tarball).should be_true
+    File.exists?(tarball).should be(true)
 
     out_dir = File.join(@tmp_dir, "out")
     FileUtils.mkdir_p(out_dir)
@@ -59,7 +59,7 @@ describe Bosh::Agent::Message::FetchLogs do
   end
 
   it "is a long running task" do
-    Bosh::Agent::Message::FetchLogs.long_running?.should be_true
+    Bosh::Agent::Message::FetchLogs.long_running?.should be(true)
   end
 
   it "fetches job logs and uploads them to blobstore"  do
@@ -80,9 +80,9 @@ describe Bosh::Agent::Message::FetchLogs do
     blobstore_id = result["blobstore_id"]
 
     test_tarball(blobstore_id) do
-      File.exists?("job_a/zb.log").should be_true
+      File.exists?("job_a/zb.log").should be(true)
       File.read("job_a/zb.log").should == "log1"
-      File.exists?("job_a/zb.log.1").should be_false
+      File.exists?("job_a/zb.log.1").should be(false)
     end
   end
 
@@ -100,9 +100,9 @@ describe Bosh::Agent::Message::FetchLogs do
     blobstore_id = result["blobstore_id"]
 
     test_tarball(blobstore_id) do
-      File.exists?("log1").should be_true
+      File.exists?("log1").should be(true)
       File.read("log1").should == "log1"
-      File.exists?("log2").should be_true
+      File.exists?("log2").should be(true)
       File.read("log2").should == "log2"
     end
   end
@@ -121,14 +121,18 @@ describe Bosh::Agent::Message::FetchLogs do
     log_dir = File.join(@base_dir, "bosh", "log")
     FileUtils.mkdir_p(log_dir)
 
-    bad_client = mock(Bosh::Blobstore::Client)
-    Bosh::Blobstore::Client.stub!(:create).and_return(bad_client)
+    bad_client = double(Bosh::Blobstore::Client)
+    Bosh::Blobstore::Client.stub(:safe_create).and_return(bad_client)
 
-    bad_client.stub!(:create).and_raise(Bosh::Blobstore::BlobstoreError.new("no mood to upload today"))
+    bad_client.stub(:create).and_raise(
+      Bosh::Blobstore::BlobstoreError.new("no mood to upload today"))
 
     lambda {
       process(:agent)
-    }.should raise_error(Bosh::Agent::MessageHandlerError, "unable to upload logs to blobstore: no mood to upload today")
+    }.should raise_error(
+      Bosh::Agent::MessageHandlerError,
+      "unable to upload logs to blobstore: no mood to upload today",
+    )
   end
 
   it "raises an error if there is a problem packing logs" do
@@ -136,8 +140,9 @@ describe Bosh::Agent::Message::FetchLogs do
     FileUtils.mkdir_p(log_dir)
 
     bad_aggregator = Bosh::Agent::FileAggregator.new
-    bad_aggregator.stub!(:add_file).and_return(true)
-    bad_aggregator.stub!(:generate_tarball).and_raise(Bosh::Agent::FileAggregator::PackagingError.new("come back later"))
+    bad_aggregator.stub(:add_file).and_return(true)
+    bad_aggregator.stub(:generate_tarball).and_raise(
+      Bosh::Agent::FileAggregator::PackagingError.new("come back later"))
 
     handler = make_handler(:agent)
     handler.aggregator = bad_aggregator
@@ -174,27 +179,27 @@ describe Bosh::Agent::Message::FetchLogs do
     [ log1, log2, log3 ].each { |file| FileUtils.touch(file) }
 
     test_handler(:job, ["foos"]) do
-      File.exists?("foo/log1").should be_true
-      File.exists?("bar/log2").should be_false
-      File.exists?("log3").should be_false
+      File.exists?("foo/log1").should be(true)
+      File.exists?("bar/log2").should be(false)
+      File.exists?("log3").should be(false)
     end
 
     test_handler(:job, ["bars"]) do
-      File.exists?("foo/log1").should be_false
-      File.exists?("bar/log2").should be_true
-      File.exists?("log3").should be_false
+      File.exists?("foo/log1").should be(false)
+      File.exists?("bar/log2").should be(true)
+      File.exists?("log3").should be(false)
     end
 
     test_handler(:job, ["foos", "bars"]) do
-      File.exists?("foo/log1").should be_true
-      File.exists?("bar/log2").should be_true
-      File.exists?("log3").should be_false
+      File.exists?("foo/log1").should be(true)
+      File.exists?("bar/log2").should be(true)
+      File.exists?("log3").should be(false)
     end
 
     test_handler(:job, ["all"]) do
-      File.exists?("foo/log1").should be_true
-      File.exists?("bar/log2").should be_true
-      File.exists?("log3").should be_true
+      File.exists?("foo/log1").should be(true)
+      File.exists?("bar/log2").should be(true)
+      File.exists?("log3").should be(true)
     end
   end
 
@@ -220,16 +225,15 @@ describe Bosh::Agent::Message::FetchLogs do
     [ log1, log2, log3 ].each { |file| FileUtils.touch(file) }
 
     test_handler(:job, ["foos"]) do
-      File.exists?("foo/log1").should be_false
-      File.exists?("log2").should be_false
-      File.exists?("log3.log").should be_false
+      File.exists?("foo/log1").should be(false)
+      File.exists?("log2").should be(false)
+      File.exists?("log3.log").should be(false)
     end
 
     test_handler(:job, ["all"]) do
-      File.exists?("foo/log1").should be_true
-      File.exists?("log2").should be_true
-      File.exists?("log3.log").should be_true
+      File.exists?("foo/log1").should be(true)
+      File.exists?("log2").should be(true)
+      File.exists?("log3.log").should be(true)
     end
   end
-
 end
