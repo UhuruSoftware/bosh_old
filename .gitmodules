@@ -1,6 +1,6 @@
 [submodule "release/src/nagios_dashboard"]
 	path = release/src/nagios_dashboard
-	url = git@github.com:UhuruSoftware/private-uhuru-dashboard.git
+	url = git@github.com:UhuruSoftware/uhuru-dashboard.git
 [submodule "go_agent/src/github.com/stretchr/testify"]
 	path = go_agent/src/github.com/stretchr/testify
 	url = https://github.com/stretchr/testify.git
