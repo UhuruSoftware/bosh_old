@@ -36,29 +36,11 @@ module Bosh
 
       def get_file(id, file)
         file_path = "#{@blobstore_path}#{id}"
-        begin
-          Net::SFTP.start(@endpoint, @user, :password => @password) do |sftp|
-            sftp.stat!(file_path) do |response|
-              unless response.ok?
-                raise BlobstoreError,
-                      "Could not fetch object, #{file_path}"
-              end
-            end
-
-            sftp.file.open(file_path, 'r') do |remote_file|
-              data = remote_file.read(1024 * 1024)
-              while data.length != 0
-                file.write(data)
-                data = remote_file.read(1024 * 1024)
-              end
-
-            end
-          end
-        rescue Net::SSH::AuthenticationFailed
-          raise BlobstoreError, "Authentication failed"
+        unless system("scp #{@user}@#{@endpoint}:#{file_path} #{file.path}")
+          raise BlobstoreError, "Could not get file: '#{@user}@#{@endpoint}:#{file_path}'"
         end
       end
-
+      
       def delete_object(id)
         file = "#{@blobstore_path}#{id}"
         begin
